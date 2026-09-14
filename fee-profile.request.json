@@ -1,0 +1,24 @@
+{
+  "schema": "sentinelx-fee-profile-request-v1",
+  "status": "awaiting-finalized-observations",
+  "network": "studio_devnet",
+  "rpc": "https://studio-dev.genlayer.com/api",
+  "chainId": 61997,
+  "headroom": 1.25,
+  "profilePath": "fee-profile.json",
+  "requiredCoverage": {
+    "deploy": [
+      "sentinelx_governor",
+      "protected_app_v1"
+    ],
+    "methods": [
+      "register_with_sentinelx",
+      "create_proposal",
+      "review_proposal",
+      "install_reviewed_upgrade",
+      "confirm_install",
+      "reconcile_install"
+    ]
+  },
+  "generationCommand": "python scripts/build_fee_profile.py --run --allow-network-writes"
+}

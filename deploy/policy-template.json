@@ -1,0 +1,20 @@
+{
+  "owner": "<<TARGET_OWNER_ADDRESS>>",
+  "target": "<<TARGET_ADDRESS>>",
+  "project_name": "SentinelX Protected App",
+  "release_constitution_file": "deploy/release-constitution.json",
+  "policy_fingerprint": "<<POLICY_FINGERPRINT_COMPUTED_AT_REGISTRATION>>",
+  "source_authority": "GIFTEDLOV/sentinelx",
+  "ci_authority": "GIFTEDLOV/sentinelx-ci",
+  "security_authority": "<<INDEPENDENT_SECURITY_AUTHORITY>>",
+  "source_prefix": "https://raw.githubusercontent.com/GIFTEDLOV/sentinelx/",
+  "ci_prefix": "https://raw.githubusercontent.com/GIFTEDLOV/sentinelx-ci/",
+  "security_prefix": "<<INDEPENDENT_SECURITY_RAW_PREFIX>>",
+  "current_version": "1.0.0",
+  "current_source_url": "https://raw.githubusercontent.com/GIFTEDLOV/sentinelx/7e3b552c8b0471db0411206fdbc743dd12ef4e80/contracts/protected_app_v1.py",
+  "current_code_hash": "f4e3cae0cf9a90702efa7d9ed286b0be05a569a83ed5e3ec9a97d3635a484b1d",
+  "max_evidence_age_seconds": 3600,
+  "proposal_ttl_seconds": 7200,
+  "execution_timeout_seconds": 3600,
+  "active": true
+}

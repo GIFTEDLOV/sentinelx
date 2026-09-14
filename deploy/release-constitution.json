@@ -1,0 +1,28 @@
+{
+  "version": "sentinelx-release-constitution-v1",
+  "required_vector": [
+    "storage_layout_compatible",
+    "public_interface_compatible",
+    "user_rights_preserved",
+    "no_privilege_escalation",
+    "upgrade_authority_preserved",
+    "consensus_integrity_preserved",
+    "finality_safety_preserved",
+    "evidence_trust_preserved",
+    "fund_flow_safe",
+    "external_fetch_surface_safe",
+    "liveness_preserved",
+    "behavioral_scope_matches_release",
+    "migration_safety_preserved",
+    "constitution_satisfied"
+  ],
+  "rules": [
+    "preserve storage layout",
+    "preserve public interface",
+    "preserve user rights",
+    "preserve the SentinelX authority",
+    "require finalized consequences",
+    "require authenticated independent evidence",
+    "preserve safe fund flow"
+  ]
+}

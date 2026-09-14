@@ -66,6 +66,8 @@ def make_envelope(args: argparse.Namespace) -> dict[str, object]:
     else:
         if args.verdict is None or args.independent_review is None:
             raise ValueError("security evidence requires --verdict and --independent-review")
+        if args.verdict != "PASS" or args.independent_review is not True:
+            raise ValueError("security evidence can be emitted only for PASS with independent_review=true")
         envelope["verdict"] = args.verdict
         envelope["independent_review"] = args.independent_review
     return envelope
