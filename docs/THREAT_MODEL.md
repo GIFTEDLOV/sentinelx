@@ -46,8 +46,9 @@ a known parent state; it never blindly rebroadcasts.
 
 ## Residual assumptions
 
-Phase 1 does not claim a deployed address, transaction hash, publisher key
-signature, or live network execution. Semantic equivalence remains a validator
+Phase 2A does not claim a deployed address, transaction hash, publisher key
+signature, or live network execution. The CI workflow is a same-owner CI
+authority, not an independent security publisher. Semantic equivalence remains a validator
 judgment constrained by the constitution and exact vector, not a formal proof
 of arbitrary Python behavior. The unsafe V2 file is intentionally retained for
 negative testing only.

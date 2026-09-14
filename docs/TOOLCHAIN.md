@@ -1,4 +1,4 @@
-# Phase 1 toolchain
+# SentinelX toolchain
 
 SentinelX is pinned to the Studio-dev/v0.6 RC family. The selected published
 versions are:
@@ -21,7 +21,8 @@ selected SDK/CLI versions are recorded in `requirements.txt` and
 `gltest.config.yaml`; JavaScript installation is deferred with the frontend.
 
 The v0.6 write standard is represented in `scripts/fee_aware_transaction.py`:
-future callers must estimate fees and carry both `FeesDistribution` and
-`feeValue`, broadcast exactly once, persist that transaction hash immediately,
-and prove finalized lifecycle, successful execution, and expected contract
-state before taking the next action.
+future callers must use the SDK's measured-profile estimator and carry both
+returned fields, `distribution` and `feeValue`, unchanged. They broadcast
+exactly once, persist that transaction hash immediately, and prove finalized
+lifecycle, successful execution, and expected contract state before taking the
+next action.

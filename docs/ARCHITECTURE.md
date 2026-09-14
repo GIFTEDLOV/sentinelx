@@ -1,8 +1,8 @@
 # SentinelX architecture
 
-SentinelX Phase 1 contains a multi-target governor and a protected target
-reference implementation. It is source-complete for local review; it has not
-been deployed.
+SentinelX contains a multi-target governor, a protected target reference
+implementation, and Phase 2A operational tooling. The contracts have not been
+deployed.
 
 ## Trust boundary
 
