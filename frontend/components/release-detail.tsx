@@ -1,0 +1,32 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, ExternalLink } from "lucide-react";
+import Link from "next/link";
+import { getSentinelXConfig, previewEnabled } from "@/lib/genlayer/chains";
+import { getProposal, getTargetPolicy } from "@/lib/genlayer/reads";
+import { PREVIEW_ONLY_FIXTURES } from "@/lib/preview-fixtures";
+import { formatTimestamp, shortHash } from "@/lib/workflow";
+import type { ReleaseProposal } from "@/lib/genlayer/types";
+import { listTransactions } from "@/lib/genlayer/transactions";
+import { useSyncExternalStore } from "react";
+import { ConsensusTimeline } from "./consensus-timeline";
+import { EvidenceCards } from "./evidence-cards";
+import { SemanticMatrix } from "./semantic-matrix";
+import { Card, EmptyState, ErrorState, KeyValue, LoadingCard, PageHeader, PreviewRibbon, StatusBadge, Tabs } from "./ui";
+
+type ReleaseTab = "Overview" | "Semantic Review" | "Evidence" | "Consensus" | "Transactions";
+
+export function ReleaseDetail({ id, tab = "Overview" }: { id: string; tab?: ReleaseTab }) {
+  const config = getSentinelXConfig(); const preview = previewEnabled(); const proposalId = Number(id); const enabled = Number.isInteger(proposalId) && proposalId > 0 && config.status === "configured";
+  const proposalQuery = useQuery({ queryKey: ["proposal", proposalId], queryFn: () => getProposal(proposalId), enabled });
+  const proposal = preview ? PREVIEW_ONLY_FIXTURES.proposal : proposalQuery.data;
+  const policyQuery = useQuery({ queryKey: ["proposal-policy", proposal?.target], queryFn: () => getTargetPolicy(proposal?.target), enabled: Boolean(proposal?.target) && enabled });
+  const subscribe = (callback: () => void) => { if (typeof window === "undefined") return () => {}; window.addEventListener("sentinelx:transactions", callback); return () => window.removeEventListener("sentinelx:transactions", callback); };
+  const records = useSyncExternalStore(subscribe, () => listTransactions().filter((record) => record.proposalId === proposal?.proposal_id), () => []);
+  if (!proposal && !proposalQuery.isLoading && !preview) return <div className="page"><Link className="button ghost" href="/app/activity"><ArrowLeft size={14} />Activity</Link><Card><EmptyState title={config.status === "configured" ? "Release data unavailable" : "Deployment not configured"} description="No release is shown without a finalized governor read. Canonical views never substitute fixture records." /></Card></div>;
+  if (!proposal) return <div className="page"><LoadingCard rows={6} /></div>;
+  const tabs = [{ label: "Overview", href: `/app/releases/${id}` }, { label: "Semantic Review", href: `/app/releases/${id}/review` }, { label: "Evidence", href: `/app/releases/${id}/evidence` }, { label: "Consensus", href: `/app/releases/${id}/consensus` }, { label: "Transactions", href: `/app/releases/${id}/transactions` }];
+  const semantic = (proposal as ReleaseProposal).semantic;
+  return <div className="page"><Link className="button ghost" href="/app/activity"><ArrowLeft size={14} />Activity</Link>{preview && <PreviewRibbon />}<PageHeader eyebrow={`Release #${proposal.proposal_id}`} title={`${proposal.parent_version} → ${proposal.candidate_version}`} description={`Target ${proposal.target} · ${proposal.release_intent}`} actions={<StatusBadge value={proposal.status} />} /><div className="copy-line" style={{ marginTop: -13, marginBottom: 20 }}><span className="mono muted">{proposal.target}</span></div><Tabs items={tabs} active={tab} />{tab === "Overview" && <div className="page-grid"><div className="grid-4 page-grid"><Card><KeyValue label="Candidate hash" mono>{shortHash(proposal.candidate_code_hash)}</KeyValue></Card><Card><KeyValue label="Parent hash" mono>{shortHash(proposal.parent_code_hash)}</KeyValue></Card><Card><KeyValue label="Policy fingerprint" mono>{shortHash(proposal.policy_fingerprint)}</KeyValue></Card><Card><KeyValue label="Evidence-set hash" mono>{shortHash(proposal.evidence_set_hash)}</KeyValue></Card></div><Card title="Release record" subtitle="Immutable proposal fields"><div className="kv-grid"><KeyValue label="Target" mono>{proposal.target}</KeyValue><KeyValue label="Proposer" mono>{proposal.proposer}</KeyValue><KeyValue label="Created">{formatTimestamp(proposal.created_at)}</KeyValue><KeyValue label="Expires">{formatTimestamp(proposal.expires_at)}</KeyValue><KeyValue label="Execution deadline">{formatTimestamp(proposal.execution_deadline)}</KeyValue><KeyValue label="Last review code" mono>{proposal.last_review_code || "—"}</KeyValue><KeyValue label="Candidate source" mono>{proposal.candidate_source_url}</KeyValue><KeyValue label="Release intent">{proposal.release_intent}</KeyValue></div></Card><div className="notice info"><div><strong>Authorization rule</strong><div>All 14 semantic booleans must be true in finalized consensus. Reasoning prose is not an authorization field.</div></div></div></div>}{tab === "Semantic Review" && <Card title="14-field semantic safety vector" subtitle="Exact booleans only · no confidence score"><SemanticMatrix vector={semantic} /></Card>}{tab === "Evidence" && <EvidenceCards proposal={proposal} policy={policyQuery.data} />}{tab === "Consensus" && <ConsensusTimeline verified={proposal.status === "VERIFIED"} />}{tab === "Transactions" && <Card title="Release transaction chain" subtitle="Parent and child hashes are shown only when persisted locally or read from chain.">{records.length ? <div className="page-grid">{records.map((record) => <div className="transaction-item" key={record.hash}><div className="transaction-top"><span className="transaction-operation">{record.operation}</span><StatusBadge value={record.verification} /></div><div className="mono">{record.hash}</div><div className="dim">{record.lifecycle.state} · {record.executionResult || "execution not read"}</div>{record.childTransactionIds.length > 0 && <div className="dim">Children: {record.childTransactionIds.join(", ")}</div>}</div>)}</div> : <EmptyState title="No transaction record" description="This release has no locally persisted transaction chain. Canonical reads do not invent transaction hashes." />}</Card>}</div>;
+}

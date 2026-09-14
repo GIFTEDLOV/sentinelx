@@ -1,0 +1,1 @@
+export default function Loading() { return <div className="page"><div className="page-grid"><div className="skeleton" style={{ width: 160, height: 12 }} /><div className="skeleton" style={{ width: 360, height: 38 }} /><div className="card" style={{ height: 240 }} /></div></div>; }
