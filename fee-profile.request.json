@@ -13,11 +13,17 @@
     ],
     "methods": [
       "register_with_sentinelx",
+      "register_target",
       "create_proposal",
       "review_proposal",
-      "install_reviewed_upgrade",
+      "repair_evidence",
+      "retry_review",
+      "cancel_proposal",
+      "expire_proposal",
+      "reconcile_install",
+      "mark_execution_timeout",
       "confirm_install",
-      "reconcile_install"
+      "install_reviewed_upgrade"
     ]
   },
   "generationCommand": "python scripts/build_fee_profile.py --run --allow-network-writes"

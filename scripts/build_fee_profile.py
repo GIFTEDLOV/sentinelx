@@ -24,11 +24,17 @@ HEADROOM = 1.25
 PROFILE = ROOT / "fee-profile.json"
 REQUIRED_METHODS = (
     "register_with_sentinelx",
+    "register_target",
     "create_proposal",
     "review_proposal",
-    "install_reviewed_upgrade",
-    "confirm_install",
+    "repair_evidence",
+    "retry_review",
+    "cancel_proposal",
+    "expire_proposal",
     "reconcile_install",
+    "mark_execution_timeout",
+    "confirm_install",
+    "install_reviewed_upgrade",
 )
 
 

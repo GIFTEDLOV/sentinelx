@@ -12,7 +12,7 @@ htmlcov/
 node_modules/
 frontend/.next/
 frontend/node_modules/
+frontend/tsconfig.tsbuildinfo
 artifacts/*.json
 !artifacts/README.md
 !artifacts/preflight-pass.example.json
-
