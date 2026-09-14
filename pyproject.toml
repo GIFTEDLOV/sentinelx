@@ -1,0 +1,21 @@
+[project]
+name = "sentinelx"
+version = "0.1.0"
+description = "Semantic release-security governance for GenLayer Intelligent Contracts"
+requires-python = ">=3.12"
+readme = "README.md"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra"
+markers = [
+  "direct: deterministic in-memory contract and policy tests",
+  "integration: requires an explicitly configured GenLayer environment",
+]
+
+[tool.pyright]
+include = ["direct", "scripts", "tests"]
+exclude = [".venv", "frontend/node_modules"]
+typeCheckingMode = "basic"
+reportMissingImports = false
