@@ -16,6 +16,7 @@ from scripts.fee_aware_transaction import (
     profile_entry_to_estimate_options,
 )
 from scripts.studio_dev_lifecycle import inspect_lifecycle, reconcile_genlayer
+from scripts.build_fee_profile import _journal_observations
 
 
 PROFILE_ENTRY = {
@@ -88,6 +89,44 @@ def test_corrupt_journal_fails_closed(tmp_path: Path):
     path.write_text("not-json", encoding="utf-8")
     with pytest.raises(JournalError, match="unreadable"):
         TransactionJournal(path).load()
+
+
+def test_fee_profile_parser_accepts_only_finalized_successful_observations(tmp_path: Path):
+    path = tmp_path / "profile-journal.json"
+    receipt = {"data": {"fee_accounting": {"fees_distribution": {"rotations": [3]}}}}
+    path.write_text(json.dumps({
+        "schema": "sentinelx-transaction-journal-v1",
+        "operations": {
+            "deploy": {
+                "state": "FINALIZED_EXECUTED",
+                "lifecycle": {"stored_status": "Finalized"},
+                "execution_result": "FINISHED_WITH_RETURN",
+                "fee_observation_kind": "deploy",
+                "contract_name": "protected_app_v1",
+                "receipt": receipt,
+            },
+            "failed": {
+                "state": "FINALIZED_EXECUTION_FAILED",
+                "lifecycle": {"stored_status": "Finalized"},
+                "execution_result": "FINISHED_WITH_ERROR",
+                "fee_observation_kind": "method",
+                "method": "not-measured",
+                "receipt": receipt,
+            },
+            "accepted": {
+                "state": "SUBMITTED",
+                "lifecycle": {"stored_status": "Accepted"},
+                "execution_result": None,
+                "fee_observation_kind": "method",
+                "method": "not-measured",
+                "receipt": receipt,
+            },
+        },
+    }), encoding="utf-8")
+    observations, deploys, methods = _journal_observations(path)
+    assert len(observations) == 1
+    assert deploys == ["protected_app_v1"]
+    assert methods == []
 
 
 def test_security_packet_contains_exact_bytes_hashes_diff_and_required_schema(tmp_path: Path):

@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import time
 from typing import Any
 
 
@@ -64,7 +65,17 @@ class TransactionJournal:
                 handle.write(rendered)
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary, self.path)
+            # Windows security/indexing software can briefly hold a freshly
+            # written JSON destination. Retry the replace without changing
+            # the atomic-write guarantee or weakening journal persistence.
+            for attempt in range(8):
+                try:
+                    os.replace(temporary, self.path)
+                    break
+                except PermissionError:
+                    if attempt == 7:
+                        raise
+                    time.sleep(0.25)
         except OSError as error:
             temporary.unlink(missing_ok=True)
             raise JournalError(f"cannot persist transaction journal: {error}") from error

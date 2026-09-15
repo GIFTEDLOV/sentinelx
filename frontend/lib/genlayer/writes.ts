@@ -52,15 +52,17 @@ export async function writeContractOnce(args: {
   account: `0x${string}`;
   target?: string;
   proposalId?: number;
+  developmentSimulation?: boolean;
 }): Promise<TransactionRecord> {
   const provider = getInjectedProvider();
   if (!provider) throw new Error("Connect a browser wallet before writing");
   const targetAddress = address(args.address);
-  const fees = await estimateWriteFees({
+  const quote = await estimateWriteFees({
     address: targetAddress,
     functionName: args.functionName,
     calldata: args.calldata,
     account: args.account,
+    developmentSimulation: args.developmentSimulation,
   });
   const submittedAt = new Date().toISOString();
   const client = getGenLayerClient(provider, args.account);
@@ -68,7 +70,10 @@ export async function writeContractOnce(args: {
     address: targetAddress,
     functionName: args.functionName,
     args: args.calldata as CalldataEncodable[] | undefined,
-    fees: feeEstimateToOptions(fees),
+    // The SDK-returned complete fee object is carried unchanged into signing.
+    // Gasless behavior is also estimator-driven: a zero quote is valid and is
+    // encoded by the SDK without any network-name special case.
+    fees: feeEstimateToOptions(quote.estimate),
   }));
   // This is deliberately the first operation after the SDK returns a hash.
   saveTransaction({

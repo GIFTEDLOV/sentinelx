@@ -55,7 +55,7 @@ export function proposalPreconditions(input: {
   candidateHash?: string;
 }): { ok: boolean; reasons: string[] } {
   const reasons: string[] = [];
-  if (!input.configured) reasons.push("SentinelX addresses and a measured fee profile are not configured");
+  if (!input.configured) reasons.push("SentinelX governor and target addresses are not configured");
   if (!input.policyActive) reasons.push("target policy is not active");
   if (input.activeProposal > 0) reasons.push("target already has an active proposal");
   if (input.candidateAlreadyInstalled) reasons.push("candidate is already installed");

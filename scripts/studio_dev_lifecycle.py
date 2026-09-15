@@ -1,10 +1,11 @@
 """Fee-aware, no-blind-rebroadcast Studio-dev lifecycle runner.
 
 The write subcommands are deliberately locked behind two explicit controls:
-``--broadcast`` and ``SENTINELX_ALLOW_BROADCAST=1``.  Every write also needs a
-real measured ``fee-profile.json``.  This makes it possible to prepare the
-canonical flow before an independent security publisher and fee observations
-exist, without accidentally creating chain state.
+``--broadcast`` and ``SENTINELX_ALLOW_BROADCAST=1``. The canonical,
+high-consequence flow also requires its measured ``fee-profile.json`` as an
+application safety policy. This runner is intentionally stricter than the
+Studio SDK, which can quote development writes from live defaults or a concrete
+write simulation before full profile coverage exists.
 """
 
 from __future__ import annotations
