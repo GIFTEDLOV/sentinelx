@@ -3,7 +3,7 @@ import type { CalldataEncodable, Hash as GenLayerHash } from "genlayer-js/types"
 import { getGenLayerClient } from "./client";
 import { getSentinelXConfig, isAddress } from "./chains";
 import { GOVERNOR_METHODS, TARGET_METHODS } from "./contracts";
-import type { ReleaseProposal, TargetPolicy, TransactionLifecycle } from "./types";
+import type { EvidenceSnapshot, ReleaseProposal, TargetPolicy, TransactionLifecycle } from "./types";
 
 function requireAddress(address: string | undefined, label: string): `0x${string}` {
   if (!isAddress(address)) throw new Error(`${label} is not configured`);
@@ -58,6 +58,16 @@ export async function getProposal(id: number): Promise<ReleaseProposal> {
 export async function getProposalStatus(id: number): Promise<string> {
   const governor = requireAddress(getSentinelXConfig().governorAddress, "SentinelX governor address");
   return String(await read(governor, GOVERNOR_METHODS.proposalStatus, [BigInt(id)]));
+}
+
+export async function getEvidenceSnapshot(id: number): Promise<EvidenceSnapshot> {
+  const governor = requireAddress(getSentinelXConfig().governorAddress, "SentinelX governor address");
+  return parseResult<EvidenceSnapshot>(await read(governor, GOVERNOR_METHODS.evidenceSnapshot, [BigInt(id)]));
+}
+
+export async function getReviewWebFetchCount(id: number): Promise<number> {
+  const governor = requireAddress(getSentinelXConfig().governorAddress, "SentinelX governor address");
+  return Number(await read(governor, GOVERNOR_METHODS.reviewWebFetchCount, [BigInt(id)]));
 }
 
 export async function getReleaseHistory(address: string): Promise<number[]> {

@@ -8,6 +8,10 @@ export const GOVERNOR_METHODS = {
   proposalStatus: "get_proposal_status",
   releaseHistory: "get_release_history",
   policyFingerprint: "get_policy_fingerprint",
+  evidenceSnapshot: "get_evidence_snapshot",
+  evidenceIdentity: "get_evidence_identity",
+  reviewWebFetchCount: "get_review_web_fetch_count",
+  captureEvidence: "capture_evidence",
   createProposal: "create_proposal",
   reviewProposal: "review_proposal",
 } as const;

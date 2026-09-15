@@ -20,7 +20,9 @@ export type SemanticVector = Record<SemanticField, boolean | null>;
 
 export type ProposalStatus =
   | "PROPOSED"
+  | "EVIDENCE_READY"
   | "EVIDENCE_REPAIR_REQUIRED"
+  | "EVIDENCE_RETRY_REQUIRED"
   | "REVIEW_RETRY_REQUIRED"
   | "REJECTED"
   | "UPGRADE_QUEUED"
@@ -31,6 +33,7 @@ export type ProposalStatus =
   | "UNKNOWN";
 
 export type EvidenceKind = "source" | "ci" | "security";
+export type SecurityAttestationMode = "OPTIONAL" | "REQUIRED_INDEPENDENT";
 
 export interface TargetPolicy {
   target: string;
@@ -44,6 +47,8 @@ export interface TargetPolicy {
   source_prefix: string;
   ci_prefix: string;
   security_prefix: string;
+  security_attestation_mode: SecurityAttestationMode;
+  security_configured?: boolean;
   current_version: string;
   current_source_url: string;
   current_code_hash: string;
@@ -77,6 +82,27 @@ export interface ReleaseProposal {
   status: ProposalStatus;
   last_review_code: string;
   semantic?: SemanticVector;
+}
+
+export interface EvidenceSnapshot {
+  status: string;
+  schema?: string;
+  proposal_id?: number;
+  evidence_identity?: string;
+  parent_source_url?: string;
+  parent_source_hash?: string;
+  candidate_source_url?: string;
+  candidate_source_hash?: string;
+  ci_evidence_url?: string;
+  ci_evidence_id?: string;
+  ci_evidence_hash?: string;
+  security_evidence_url?: string;
+  security_evidence_id?: string;
+  security_evidence_hash?: string;
+  security_present?: boolean;
+  policy_fingerprint?: string;
+  captured_at?: number;
+  snapshot_digest?: string;
 }
 
 export interface EvidenceEnvelope {
