@@ -5,6 +5,9 @@ from genlayer import Address, u256
 import hashlib
 
 
+TARGET_SCHEMA_VERSION = "sentinelx-target-v2"
+
+
 @gl.contract.interface
 class SentinelXGovernorInterface:
     class View:

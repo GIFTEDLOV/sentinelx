@@ -72,3 +72,46 @@ def test_target_upgrade_path_checks_governor_sender_and_live_authorization():
         assert "sender_address != self.sentinelx_governor" in text
         assert "is_upgrade_authorized" in text
         assert "confirm_install" in text
+
+
+def test_v2_governor_declares_bounded_attestation_modes_and_snapshot_schema():
+    text = (CONTRACT_DIR / "sentinelx_governor.py").read_text(encoding="utf-8")
+    assert 'SCHEMA_VERSION = "sentinelx-governor-v2"' in text
+    assert 'SNAPSHOT_SCHEMA = "sentinelx-evidence-snapshot-v2"' in text
+    assert 'SECURITY_OPTIONAL = "OPTIONAL"' in text
+    assert 'SECURITY_REQUIRED_INDEPENDENT = "REQUIRED_INDEPENDENT"' in text
+    assert 'STATUS_EVIDENCE_READY = "EVIDENCE_READY"' in text
+
+
+def test_v2_policy_and_snapshot_storage_are_explicitly_bound():
+    policy_fields = field_names("sentinelx_governor.py")
+    assert "evidence_snapshots" in policy_fields
+    text = (CONTRACT_DIR / "sentinelx_governor.py").read_text(encoding="utf-8")
+    assert "security_attestation_mode: str" in text
+    assert "class EvidenceSnapshotRecord" in text
+    assert "snapshot_digest: str" in text
+    assert "evidence_snapshots: TreeMap[str, EvidenceSnapshotRecord]" in text
+
+
+def test_v2_capture_can_fetch_but_review_path_has_no_web_fetch_call():
+    module = parsed("sentinelx_governor.py")
+    functions = {
+        node.name: node for node in ast.walk(module)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    capture = ast.unparse(functions["capture_evidence"])
+    review = ast.unparse(functions["_review_proposal"])
+    snapshot_review = ast.unparse(functions["_independent_snapshot_review"])
+    assert "gl.nondet.web.get" in ast.unparse(functions["_fetch_bytes"])
+    assert "gl.nondet.web.get" not in capture
+    assert "gl.nondet.web.get" not in review
+    assert "gl.nondet.web.get" not in snapshot_review
+    assert "_independent_snapshot_review" in review
+    assert "review_web_fetch_counts[proposal_id] = 0" in review
+
+
+def test_v2_target_registration_interfaces_include_attestation_mode():
+    for name in ("protected_app_v1.py", "protected_app_v2_safe.py"):
+        text = (CONTRACT_DIR / name).read_text(encoding="utf-8")
+        assert "security_attestation_mode: str" in text
+        assert "security_attestation_mode," in text

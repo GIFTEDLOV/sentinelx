@@ -5,6 +5,9 @@ from genlayer import Address, u256
 import hashlib
 
 
+TARGET_SCHEMA_VERSION = "sentinelx-target-v2"
+
+
 @gl.contract.interface
 class SentinelXGovernorInterface:
     class View:
@@ -23,6 +26,7 @@ class SentinelXGovernorInterface:
             release_constitution: str,
             source_authority: str,
             ci_authority: str,
+            security_attestation_mode: str,
             security_authority: str,
             source_prefix: str,
             ci_prefix: str,
@@ -39,9 +43,10 @@ class SentinelXGovernorInterface:
 
 
 class ProtectedApplication(gl.contract.Contract):
-    """Reference protected target for SentinelX.
+    """SentinelX V2 baseline target with a V1-compatible storage prefix.
 
-    These fields are the v1 persistent layout. The owner is a normal product
+    These fields are the historical V1 persistent layout reused as the V2
+    baseline. No migration is required because V2 has not been deployed. The owner is a normal product
     administrator and is deliberately never added to Root.upgraders. Only the
     governor address is able to reach install_reviewed_upgrade through the
     GenVM code replacement capability.
@@ -125,6 +130,7 @@ class ProtectedApplication(gl.contract.Contract):
         release_constitution: str,
         source_authority: str,
         ci_authority: str,
+        security_attestation_mode: str,
         security_authority: str,
         source_prefix: str,
         ci_prefix: str,
@@ -147,6 +153,7 @@ class ProtectedApplication(gl.contract.Contract):
             release_constitution,
             source_authority,
             ci_authority,
+            security_attestation_mode,
             security_authority,
             source_prefix,
             ci_prefix,

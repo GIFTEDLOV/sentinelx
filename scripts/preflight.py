@@ -113,6 +113,16 @@ def main() -> int:
         gates["tool_versions"] = {"ok": False, "error": str(error)}
         gates["network"] = {"ok": False, "error": str(error)}
 
+    try:
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from scripts.v2_source_manifest import verify_manifest
+
+        manifest_errors = verify_manifest()
+        gates["v2_source_manifest"] = {"ok": not manifest_errors, "errors": manifest_errors}
+    except Exception as error:
+        gates["v2_source_manifest"] = {"ok": False, "errors": [str(error)]}
+
     parse_ok = True
     for path in CONTRACTS:
         try:

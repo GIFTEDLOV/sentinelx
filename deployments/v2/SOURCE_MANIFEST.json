@@ -1,0 +1,39 @@
+{
+  "chain_id": 61997,
+  "contract_version": "SentinelX V2",
+  "contracts": [
+    {
+      "bytes": 75687,
+      "path": "contracts/sentinelx_governor.py",
+      "sha256": "174d64b3bca21ead43f36dff38ccb1ac13aafd77282a6821339bcd1f41394db2"
+    },
+    {
+      "bytes": 6989,
+      "path": "contracts/protected_app_v1.py",
+      "sha256": "beb27e7909b788549ae086ad105b2091477a724c645728eef26b10408d9e36dc"
+    },
+    {
+      "bytes": 6769,
+      "path": "contracts/protected_app_v2_safe.py",
+      "sha256": "a5fce03687757b2019ca8bd5c44a87cdea0c0179fd3efc087afe568250e5385a"
+    },
+    {
+      "bytes": 3463,
+      "path": "contracts/protected_app_v2_unsafe.py",
+      "sha256": "0f5d99fc3830d9291ff60dafac501f87c830f56cfdf68aceedc2774595cc1158"
+    }
+  ],
+  "network": "studio-dev",
+  "rpc": "https://studio-dev.genlayer.com/api",
+  "schema": "sentinelx-v2-source-manifest-v1",
+  "source_lineage": "SentinelX V1 historical pre-canonical source -> V2 first-canonical candidate",
+  "toolchain": {
+    "genlayer_cli": "0.40.0-rc.3",
+    "genlayer_js": "2.0.0-rc.1",
+    "genlayer_py": "0.19.0rc2",
+    "genvm_linter_semantic": "0.11.1rc2",
+    "genvm_linter_static": "0.11.0",
+    "genvm_runner": "v0.6.0-rc5",
+    "gltest": "0.30.0rc2"
+  }
+}
