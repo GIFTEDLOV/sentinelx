@@ -1,18 +1,18 @@
 # Integration profiling
 
-This directory is reserved for the explicitly authorized Local Studio
-profiling suite. The suite must use the installed `gltest` RC against the
-official Docker-backed Localnet, not Direct Mode or GLSim, and every measured
-scenario must be both `FINALIZED` and execution-successful.
+This directory is reserved for the explicitly authorized fee-reporting
+profiling suite. The suite may use the installed `gltest` RC against the
+official hosted Studio-dev environment at
+`https://studio-dev.genlayer.com/api` (chain `61997`); every measured scenario
+must be both `FINALIZED` and execution-successful.
 
-The Phase 2C environment audit did not produce a runnable suite: the healthy
-`v0.65.0` Compose stack reported chain `61999` (stable Studionet-era
-configuration), while the required Localnet chain is `61127`. The attempted
-`v0.123.0-rc.6` stack could not be started because its Hardhat image tag was
-unpublished and its JSON-RPC container failed readiness with `missing field
-extra_tld`. No profiling transaction or fee profile was created.
+The earlier Local Studio/Docker audit remains historical context only; it is
+not a blocker for this pass because the official documentation permits a
+fee-reporting Studio/network. Do not reinterpret Studio v0.123 as a
+`--localnet-version` value.
 
 `scripts/build_fee_profile.py --dry-run` prints the fail-closed profile
 command. `fee-profile.request.json` is a request manifest, never a measured
-profile. Add integration tests only when the correct Local Studio RC is
-verified and receipts expose measured fee accounting.
+profile. The disposable SDK runner and journal are the source for the current
+partial profile; add scenarios only when their finalized receipts genuinely
+exist.

@@ -27,5 +27,9 @@ NEXT_PUBLIC_SENTINELX_FEE_PROFILE_URL=/fee-profile.json
 ```
 
 The address fields are intentionally empty until a real deployment exists.
-Write controls remain disabled without configured addresses and a real fee
-profile.
+Write quoting does not require a fee profile. A matching measured entry is
+preferred; otherwise genlayer-js uses the live network-default quote, and an
+explicit development flag can select the concrete write simulation estimator.
+Gasless behavior is taken from the returned estimate, never inferred from the
+network name. Production policy may still require measured coverage for
+high-consequence operations.

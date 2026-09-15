@@ -1,7 +1,7 @@
 # Phase 2A tooling status
 
-SentinelX is prepared for a later, explicitly authorized Studio-dev lifecycle
-run. The configured network is `studio-dev` at
+SentinelX's canonical lifecycle remains reserved for an explicitly authorized
+Studio-dev run. The configured network is `studio-dev` at
 `https://studio-dev.genlayer.com/api`, chain ID `61997`, using the pinned RC
 family in `requirements.txt` and GenLayer CLI `0.40.0-rc.3`.
 
@@ -15,16 +15,18 @@ canonical raw-GitHub prefixes. It additionally requires the raw GitHub owner
 of the security prefix to differ from the source owner. Therefore a legitimate
 independent security publisher is still required before target registration.
 
-`scripts/build_fee_profile.py` refuses to create a profile without finalized
-observations for deployment and every required lifecycle method. The tracked
-`fee-profile.request.json` is only the coverage manifest; no guessed or empty
-fee profile is checked in.
+`scripts/build_fee_profile.py --from-journal` creates a profile from finalized
+successful observations in the disposable profiling journal. Coverage is
+honest and may be partial; `artifacts/fee-profile-coverage.json` lists methods
+that were not measured. The tracked `fee-profile.request.json` remains the
+request manifest for full canonical coverage.
 
 `scripts/studio_dev_lifecycle.py` contains the write order, live SDK fee quote,
 single-broadcast journal reservation, immediate returned-hash persistence,
 same-hash reconciliation, expected final-state read, child tracking, and
-decision-bound v0.6 `Finalize` handling. Writes require both `--broadcast` and
-`SENTINELX_ALLOW_BROADCAST=1`, plus a measured fee profile.
+decision-bound v0.6 `Finalize` handling. The canonical runner intentionally
+requires its measured profile as an application safety policy; this does not
+mean the Studio SDK cannot quote an unprofiled development write.
 
 `scripts/build_security_review_packet.py` prepares exact parent/candidate bytes,
 SHA-256 values, a semantic diff, the constitution, release intent, and the
@@ -32,5 +34,5 @@ required security envelope schema. It produces no verdict or security
 evidence. `scripts/inject_security_authority.py` later accepts only a supplied
 canonical raw-GitHub prefix owned by a different owner.
 
-No chain write, deployment, target registration, security evidence, or frontend
-implementation is claimed by this phase.
+No canonical chain write, target registration, or security evidence is claimed
+by this phase.
