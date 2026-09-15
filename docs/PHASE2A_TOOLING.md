@@ -1,4 +1,8 @@
-# Phase 2A tooling status
+# Phase 2A tooling status — V1 historical tooling
+
+The Phase 2A contract assumptions are retained for V1 provenance. Phase 2F
+defines the pre-canonical V2 architecture and supersedes the universal
+security-attestation requirement.
 
 SentinelX's canonical lifecycle remains reserved for an explicitly authorized
 Studio-dev run. The configured network is `studio-dev` at
@@ -10,16 +14,16 @@ the separate repository `GIFTEDLOV/sentinelx-ci`; its workflow checks out exact
 source commits, runs the deterministic gates, and uploads a CI envelope for
 authorized publication review. It does not publish security evidence.
 
-The governor requires three distinct authority strings and three distinct
-canonical raw-GitHub prefixes. It additionally requires the raw GitHub owner
-of the security prefix to differ from the source owner. Therefore a legitimate
-independent security publisher is still required before target registration.
+The V1 governor required three distinct authority strings and three distinct
+canonical raw-GitHub prefixes, with a different raw GitHub security owner. V2
+replaces that universal prerequisite with an immutable `OPTIONAL` or
+`REQUIRED_INDEPENDENT` target policy. The stronger distinct-owner rules remain
+enforced in `REQUIRED_INDEPENDENT` mode.
 
-`scripts/build_fee_profile.py --from-journal` creates a profile from finalized
-successful observations in the disposable profiling journal. Coverage is
-honest and may be partial; `artifacts/fee-profile-coverage.json` lists methods
-that were not measured. The tracked `fee-profile.request.json` remains the
-request manifest for full canonical coverage.
+`scripts/build_fee_profile.py --from-journal` is historical profiling tooling;
+new output is isolated under `artifacts/v2/` and must be measured against V2.
+The preserved V1 profile is under `artifacts/v1/` and is not authoritative for
+V2.
 
 `scripts/studio_dev_lifecycle.py` contains the write order, live SDK fee quote,
 single-broadcast journal reservation, immediate returned-hash persistence,

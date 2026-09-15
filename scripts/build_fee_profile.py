@@ -24,7 +24,9 @@ RPC = "https://studio-dev.genlayer.com/api"
 NETWORK = "studio_devnet"
 CHAIN_ID = 61997
 HEADROOM = 1.25
-PROFILE = ROOT / "fee-profile.json"
+# V1 measurements are preserved under artifacts/v1. Any future invocation of
+# this generic profiler must write a separately reviewed V2 artifact.
+PROFILE = ROOT / "artifacts" / "v2" / "fee-profile.json"
 REQUESTED_METHODS = (
     "register_with_sentinelx",
     "register_target",
@@ -154,7 +156,7 @@ def build_profile_from_journal(
         "finalizedOnly": True,
         "acceptedOnlyExcluded": True,
     }
-    coverage_path = ROOT / "artifacts" / "fee-profile-coverage.json"
+    coverage_path = ROOT / "artifacts" / "v2" / "fee-profile-coverage.json"
     coverage_path.parent.mkdir(parents=True, exist_ok=True)
     coverage_path.write_text(json.dumps(coverage, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     return profile
@@ -184,7 +186,7 @@ def main() -> int:
             parser.error(str(error))
         methods = profile.get("methods")
         observed_methods = sorted(methods.keys()) if isinstance(methods, dict) else []
-        print(json.dumps({"profile": str(PROFILE), "coverage": str(ROOT / "artifacts" / "fee-profile-coverage.json"), "observed_methods": observed_methods}, indent=2))
+        print(json.dumps({"profile": str(PROFILE), "coverage": str(ROOT / "artifacts" / "v2" / "fee-profile-coverage.json"), "observed_methods": observed_methods}, indent=2))
         return 0
     if not args.allow_network_writes or os.environ.get("SENTINELX_ALLOW_BROADCAST") != "1":
         parser.error("--run requires --allow-network-writes and SENTINELX_ALLOW_BROADCAST=1")

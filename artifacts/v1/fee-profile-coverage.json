@@ -1,0 +1,22 @@
+{
+  "schema": "sentinelx-fee-profile-coverage-v1",
+  "profilePath": "artifacts/v1/fee-profile.json",
+  "network": "studio_devnet",
+  "chainId": 61997,
+  "contractVersion": "SentinelX V1 — historical pre-canonical source",
+  "observed": {
+    "deploy": ["sentinelx_governor", "protected_app_v1"],
+    "methods": ["set_protected_value"]
+  },
+  "missing": {
+    "methods": [
+      "register_with_sentinelx", "register_target", "create_proposal",
+      "review_proposal", "repair_evidence", "retry_review", "cancel_proposal",
+      "expire_proposal", "reconcile_install", "mark_execution_timeout",
+      "confirm_install", "install_reviewed_upgrade"
+    ]
+  },
+  "headroom": 1.25,
+  "canonical": false,
+  "historical": true
+}

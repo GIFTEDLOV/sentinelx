@@ -13,6 +13,7 @@ fee-reporting Studio/network. Do not reinterpret Studio v0.123 as a
 
 `scripts/build_fee_profile.py --dry-run` prints the fail-closed profile
 command. `fee-profile.request.json` is a request manifest, never a measured
-profile. The disposable SDK runner and journal are the source for the current
-partial profile; add scenarios only when their finalized receipts genuinely
-exist.
+profile. The historical V1 disposable SDK runner and journal are not V2
+measurements; add V2 scenarios only when their finalized receipts genuinely
+exist. V2 may use live SDK estimates during development before a fresh V2
+profile is made.

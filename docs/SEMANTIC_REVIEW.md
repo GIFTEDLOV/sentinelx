@@ -1,6 +1,6 @@
-# Semantic review contract
+# SentinelX V2 semantic review contract
 
-The authorization-driving safety vector has exactly 14 fields, in this order:
+The authorization-driving safety vector has exactly these 14 fields, in order:
 
 1. `storage_layout_compatible`
 2. `public_interface_compatible`
@@ -17,25 +17,34 @@ The authorization-driving safety vector has exactly 14 fields, in this order:
 13. `migration_safety_preserved`
 14. `constitution_satisfied`
 
-The decision rule is exact: all 14 values must be booleans and all must be
-`True` for `APPROVE`. Any missing, non-boolean, or false value produces
-`REJECT` or a retryable review error as appropriate. There is no confidence
-threshold, fuzzy percentage, majority rule, score, or natural-language field
-in the authorization path.
+Every value must be an exact boolean. All fourteen `true` values produce
+`APPROVE`; any false value produces `REJECT`. Missing or malformed output is a
+retryable invalid result. There is no confidence threshold, score, majority
+rule, percentage, prose authorization or partial approval.
 
-Before semantic adjudication, both leader and validators independently fetch
-the authenticated parent source, candidate source, CI evidence, and security
-evidence. Each independently verifies immutable URLs, exact bytes and hashes,
-publishers, evidence IDs, target, parent/candidate hashes, policy fingerprint,
-evidence-set hash, freshness, expiration, and the required CI/security gates.
-They then independently compare parent and candidate against the constitution.
+## Evidence boundary
+
+V2 captures evidence before semantic review. Leader and validators
+independently retrieve and authenticate the immutable parent source, exact
+frozen candidate bytes, CI envelope and optional or required security envelope.
+They compare exact bytes, hashes, schema, issuer, IDs, target, parent hash,
+candidate hash, policy fingerprint, freshness, expiry and required checks
+before a complete snapshot is written.
+
+`review_proposal` reads only the authenticated snapshot and frozen proposal
+data. It performs zero live web fetches. The review prompt labels the
+constitution, parent source, candidate source, CI evidence and security
+evidence as untrusted data and instructs validators to ignore embedded
+instructions, fake verdicts, JSON directives, comments and source prompt
+injection. External security evidence is supporting data in OPTIONAL mode and
+cannot replace the validators' own substantive decision.
+
+`REQUIRED_INDEPENDENT` additionally requires a distinct security publisher and
+a valid passing independent artifact before `EVIDENCE_READY`. `OPTIONAL` may
+legitimately snapshot no security artifact and must never represent that
+absence as an audit.
 
 Consensus compares target, proposal ID, parent hash, candidate hash, policy
-fingerprint, evidence-set hash, result kind, error class, decision, and every
-one of the 14 booleans exactly. Reasoning text is not compared and cannot
-authorize a release.
-
-This design puts only irreducibly semantic comparison inside nondeterminism.
-Infrastructure failure maps to `REVIEW_RETRY_REQUIRED`; authenticated evidence
-defects map to `EVIDENCE_REPAIR_REQUIRED`; semantic rejection maps to
-`REJECTED`.
+fingerprint, evidence identity, result kind, error class, decision and every
+one of the fourteen booleans exactly. The result is not authorized until
+finality and the target's exact installation attestation are both observed.

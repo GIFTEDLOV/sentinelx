@@ -1,4 +1,4 @@
-# Phase 2C Local Studio Audit
+# Phase 2C Local Studio Audit — historical context
 
 Phase 2C did not cross the canonical deployment boundary. No Studio-dev
 transaction, local profiling transaction, or fee profile was created.
@@ -30,9 +30,11 @@ configuration. It also reports Localnet support beginning at `v0.65.0`.
 3. GLSim remains excluded because its fee configuration is disabled/zero
    priced and it does not provide the required finalized receipt accounting.
 
-The correct next step is to obtain or install the coherent v0.6 RC Local
-Studio image set that reports chain `61127` and exposes consumed fee data in
-finalized receipts. Until then, `fee-profile.json` must remain absent.
+The historical investigation suggested obtaining a coherent v0.6 RC Local
+Studio image set that reports chain `61127`. That is no longer a V2 blocker:
+Studio-dev itself is the allowed fee-reporting environment, and SDK estimates
+are valid during development/profiling without a completed profile. No local
+Docker investigation is required for the V2 source freeze.
 
 References:
 

@@ -1,11 +1,11 @@
 """Fee-aware, no-blind-rebroadcast Studio-dev lifecycle runner.
 
 The write subcommands are deliberately locked behind two explicit controls:
-``--broadcast`` and ``SENTINELX_ALLOW_BROADCAST=1``. The canonical,
-high-consequence flow also requires its measured ``fee-profile.json`` as an
-application safety policy. This runner is intentionally stricter than the
-Studio SDK, which can quote development writes from live defaults or a concrete
-write simulation before full profile coverage exists.
+``--broadcast`` and ``SENTINELX_ALLOW_BROADCAST=1``. The historical V1
+``fee-profile.json`` is not valid V2 production coverage. This legacy runner
+remains stricter than the Studio SDK, which can quote development writes from
+live defaults or a concrete write simulation before full V2 profile coverage
+exists.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ if str(ROOT) not in sys.path:
 RPC = "https://studio-dev.genlayer.com/api"
 NETWORK = "studio-dev"
 CHAIN_ID = 61997
-PROFILE = ROOT / "fee-profile.json"
+PROFILE = ROOT / "artifacts" / "v2" / "fee-profile.json"
 JOURNAL = ROOT / "artifacts" / "studio-dev-transactions.json"
 DEFAULT_APPEAL_ROUNDS = 1
 

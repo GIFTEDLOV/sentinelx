@@ -1,50 +1,50 @@
 # SentinelX architecture
 
-SentinelX contains a multi-target governor, a protected target reference
-implementation, and Phase 2A operational tooling. The contracts have not been
-deployed.
+SentinelX V2 is a pre-canonical multi-target governor and protected-target
+architecture for GenLayer. V1 is the historical pre-canonical prototype at
+commit `7e3b552c8b0471db0411206fdbc743dd12ef4e80`; it remains in history and
+has not been deployed canonically. The V2 source and state layout are a new
+first-deployment design, so V1 storage migration is not required.
 
 ## Trust boundary
 
-`sentinelx_governor.py` is the policy registry and release state machine.
-Each target registers once. The registration stores an immutable
-`TargetPolicy`, including the release constitution, authority namespaces, and
-immutable raw-commit URL prefixes. Registration fields are not owner-editable;
-only the current release identity advances after exact verified installation.
+The governor registers an immutable `TargetPolicy`, including the Release
+Constitution, bounded authority namespaces, immutable raw-commit prefixes and
+an explicit `OPTIONAL` or `REQUIRED_INDEPENDENT` security-attestation mode.
+Each proposal freezes the target, parent snapshot, candidate bytes and hash,
+release intent, evidence IDs, policy fingerprint and deadlines.
 
-Each `ReleaseProposal` freezes its target, parent snapshot, candidate bytes,
-candidate SHA-256, candidate source URL, evidence URLs and IDs, evidence-set
-hash, policy fingerprint, release intent, and deadlines. Evidence IDs are
-reserved globally, independent of evidence kind, so cancellation cannot make
-an attestation replayable on another target.
+Before review, `capture_evidence` independently retrieves and authenticates
+the exact parent source, frozen candidate source, CI evidence and optional or
+required security evidence. Only consensus on the complete result writes a
+write-once, proposal-bound `EvidenceSnapshotRecord`.
 
-The governor authenticates immutable source and evidence before asking the
-nondeterministic model for the semantic result. The leader and validators each
-repeat retrieval, hash, binding, publisher, freshness, and evidence checks.
-Only exact agreement on the identity fields, result/error class, decision, and
-all 14 semantic booleans can authorize an upgrade.
+Semantic review consumes the stored snapshot and performs zero live web
+fetches. Validators independently compare the exact 14-field boolean result;
+only fourteen `true` values can queue installation. The constitution, sources
+and evidence are untrusted data inside explicit prompt delimiters, so embedded
+instructions cannot become authorization.
 
-`protected_app_v1.py` adds only the governor to `Root.upgraders`. An owner can
-change application data and initiate one-time registration, but cannot replace
-code. Installation is reachable only through a governor-sender check, repeats
-live authorization and candidate identity checks, stores an installation
-attestation, and sends finalized confirmation back to the governor.
-
-`protected_app_v2_safe.py` preserves the v1 field prefix, owner rights, and
-governor authority, then appends a release-note feature. The unsafe candidate
-is intentionally test-only: it shifts storage, exposes owner code replacement,
-permits governor rewriting and privileged mutation, and contains an unsafe
-value flow. It is never the canonical upgrade candidate.
+`protected_app_v1.py` is the V2 baseline target name retained for source
+lineage. Its historical field prefix is preserved and its owner is not a Root
+upgrader. The safe V2 candidate appends only `release_note`; the unsafe
+candidate is test-only and demonstrates storage, authority and value-flow
+violations.
 
 ## State and recovery
 
-Temporary fetch/model failures use `REVIEW_RETRY_REQUIRED`; malformed or
-expired authenticated evidence uses `EVIDENCE_REPAIR_REQUIRED`; semantic
-disagreement or a failed safety vector is `REJECTED`. Queued installations
-expire at their execution deadline. A finalized exact installation may be
-reconciled without rebroadcast; an unknown or late child cannot install after
-authorization expiry.
+The lifecycle is `PROPOSED → EVIDENCE_READY → review → UPGRADE_QUEUED →
+VERIFIED`. Retrieval failures are retryable; authenticated evidence defects are
+repairable. Evidence identity is derived from committed hashes and identifiers,
+not URL availability. Exact-byte mirrors may be used as recovery transport.
+Snapshots are write-once and bounded views expose hashes, IDs, provenance and
+the snapshot digest without exposing raw bytes through the public view.
 
-Reads are bounded by explicit target, proposal, and history capacities. The
-direct suite uses a deterministic in-memory model to exercise these invariants
-without fabricating network transactions.
+Finalized installation remains separately reconciled. Accepted is not
+finalized, finalized execution failure is not success, and an ambiguous child
+is never authorization. The operational transaction order is precondition read
+→ fresh fee quote → one broadcast → immediate hash persistence → same-hash
+reconciliation → finality → execution result → expected-state readback.
+
+The direct suite uses a deterministic in-memory V2 model for architecture
+coverage without fabricating network transactions.
