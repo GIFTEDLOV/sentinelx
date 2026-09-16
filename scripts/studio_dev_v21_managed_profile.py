@@ -449,6 +449,10 @@ def main() -> int:
     # A resume after a reconciled CLI broadcast must retain the original
     # before-first-write measurements, not replace them with post-recovery
     # values.
+    if run.get("repository_head_at_first_write") == "5efe4d5fa907a672e39c986a19f772ceabb8940b":
+        # The first V2.1 broadcast was made from ce54d91; repair the copied
+        # bootstrap value while preserving the original source revision.
+        run["repository_head_at_first_write"] = run.get("source_revision", SOURCE_REVISION)
     for key, value in initial_run.items():
         run.setdefault(key, value)
     _save_run(run)
