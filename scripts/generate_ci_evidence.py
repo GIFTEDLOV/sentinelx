@@ -70,14 +70,15 @@ def run_deterministic_gates() -> dict[str, bool]:
     """Run the gates that are available to a public CI checkout."""
     preflight = _run([sys.executable, "scripts/preflight.py"])
     direct_tests = _run([sys.executable, "-m", "pytest", "tests/direct", "-q", "--tb=short"])
+    adversarial_tests = _run([sys.executable, "scripts/v2_mutation_runner.py"])
     typecheck = _run([sys.executable, "scripts/typecheck_contracts.py"])
-    all_local = preflight and direct_tests and typecheck
+    all_local = preflight and direct_tests and adversarial_tests and typecheck
     return {
         "genvm_lint": preflight,
         "typecheck": typecheck,
         "schema": preflight,
         "direct_tests": direct_tests,
-        "adversarial_tests": direct_tests,
+        "adversarial_tests": adversarial_tests,
         "source_parity": False,
         "transaction_safety": all_local,
     }

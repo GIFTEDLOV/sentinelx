@@ -1,0 +1,68 @@
+{
+  "schema": "sentinelx-v2-deployment-readiness-v1",
+  "phase": "2G",
+  "status": "BLOCKED_PENDING_DISPOSABLE_PROFILE",
+  "github_source_sha": "14246d63949d0f41d41a7d9fbae80c3ef6aa6931",
+  "governor_source_sha256": "174d64b3bca21ead43f36dff38ccb1ac13aafd77282a6821339bcd1f41394db2",
+  "protected_v1_source_sha256": "beb27e7909b788549ae086ad105b2091477a724c645728eef26b10408d9e36dc",
+  "safe_candidate_sha256": "a5fce03687757b2019ca8bd5c44a87cdea0c0179fd3efc087afe568250e5385a",
+  "unsafe_candidate_sha256": "0f5d99fc3830d9291ff60dafac501f87c830f56cfdf68aceedc2774595cc1158",
+  "source_manifest_sha256": "9aa17aa681f3f398f7e7ac03e2f74f02ff73cd074d5cfcac056d9e2b621c5e4f",
+  "v2_fee_profile_sha256": null,
+  "network": {
+    "name": "studio-dev",
+    "rpc": "https://studio-dev.genlayer.com/api",
+    "chain_id": 61997,
+    "profile_only": true
+  },
+  "toolchain": {
+    "genlayer_cli": "0.40.0-rc.3",
+    "genlayer_js": "2.0.0-rc.1",
+    "genlayer_py": "0.19.0rc2",
+    "genvm_linter_semantic": "0.11.1rc2",
+    "genvm_linter_static": "0.11.0",
+    "genvm_runner": "v0.6.0-rc5",
+    "gltest": "0.30.0rc2",
+    "pyright": "1.1.410",
+    "pytest": "8.4.1"
+  },
+  "gates": {
+    "direct_tests": {"count": 114, "result": "PASS"},
+    "mutation_tests": {"count": 28, "killed": 28, "result": "PASS", "surviving": []},
+    "static_lint": "PASS",
+    "semantic_validation": "PASS",
+    "preflight": "PASS",
+    "source_manifest": "PASS",
+    "v2_source_unchanged": true,
+    "v2_source_hashes_match_frozen": true,
+    "frontend_tests": {"count": 20, "result": "PASS"},
+    "frontend_typecheck": "PASS",
+    "frontend_build": "PASS",
+    "frontend_lint": "PASS"
+  },
+  "profiling": {
+    "deployer": null,
+    "balance_before": null,
+    "nonce_before": null,
+    "pending_nonce_before": null,
+    "unresolved_transaction_journal": null,
+    "fee_profile": null,
+    "governor": null,
+    "target": null,
+    "optional_policy_registration": "NOT_ATTEMPTED",
+    "policy_fingerprint": null,
+    "ci_evidence_commit": null,
+    "ci_evidence_fetch_verified": false,
+    "safe_profile_proposal": null,
+    "unsafe_profile_proposal": null,
+    "profile_evidence_status": "NOT_CREATED"
+  },
+  "canonical_deployment_status": "NOT_YET_DEPLOYED",
+  "canonical_deployment_attempted": false,
+  "blockers": [
+    "SENTINELX_PRIVATE_KEY was not available, so the disposable Studio-dev lifecycle could not be authorized or executed.",
+    "No finalized V2 profiling transactions exist; therefore no valid V2 fee profile can be generated.",
+    "No CI evidence was published because it must bind to a real disposable target and policy."
+  ],
+  "ready_for_canonical_phase_3": false
+}

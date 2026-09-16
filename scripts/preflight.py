@@ -80,7 +80,10 @@ def find_linter() -> str | None:
 
 
 def find_cli() -> str | None:
-    found = shutil.which("genlayer")
+    # On Windows PowerShell can resolve the shim before the .cmd launcher.
+    # The .cmd path is the directly executable npm launcher and preserves the
+    # exact RC version check below.
+    found = shutil.which("genlayer.cmd") or shutil.which("genlayer")
     if found:
         return found
     known = Path(os.environ.get("APPDATA", "")) / "npm" / "genlayer.cmd"
