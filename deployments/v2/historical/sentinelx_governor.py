@@ -1131,15 +1131,6 @@ class SentinelXGovernor(gl.contract.Contract):
         if target_view.get_upgrade_governor() != gl.message.contract_address:
             raise gl.vm.UserError("Target is not configured for this SentinelX governor")
 
-        # GenVM v0.6 serializes an absent optional string in an internal
-        # message as integer zero. Normalize that wire representation before
-        # validation, fingerprinting, and storage so OPTIONAL registration
-        # remains an explicit absence rather than a runtime type failure.
-        if not security_authority:
-            security_authority = ""
-        if not security_prefix:
-            security_prefix = ""
-
         self._text_ok(project_name, "project_name", 1, MAX_TEXT_BYTES)
         self._text_ok(current_version, "current_version", 1, MAX_VERSION_BYTES)
         if not self._constitution_valid(release_constitution):
@@ -1534,12 +1525,6 @@ class SentinelXGovernor(gl.contract.Contract):
     @gl.public.view
     def get_target(self, target: str) -> str:
         return self.get_target_policy(target)
-
-    @gl.public.view
-    def is_target_registered(self, target: str) -> bool:
-        if not self._is_address_text(target) or Address(target) not in self.policies:
-            return False
-        return bool(self.policies[Address(target)].active)
 
     @gl.public.view
     def get_target_policy(self, target: str) -> str:

@@ -17,6 +17,7 @@ from direct.sentinelx_v2_model import (
     REQUIRED_INDEPENDENT,
     RETRY,
     SentinelXV2Model,
+    SentinelXV2TargetModel,
     SentinelXError,
 )
 
@@ -48,8 +49,8 @@ def constitution() -> str:
 
 
 def register(model: SentinelXV2Model, *, mode: str = OPTIONAL,
-             security_authority: str = "security-support",
-             security_prefix: str = SECURITY) -> None:
+             security_authority: str | int = "security-support",
+             security_prefix: str | int = SECURITY) -> None:
     model.register_target(
         target=TARGET, owner=OWNER, project_name="V2 demo", constitution=constitution(),
         source_authority="source-owner", ci_authority="ci-owner",
@@ -118,6 +119,81 @@ def all_true() -> dict[str, bool]:
     return {key: True for key in SEMANTIC_VECTOR}
 
 
+def registration_args() -> dict[str, object]:
+    return {
+        "project_name": "V2 async registration",
+        "constitution": constitution(),
+        "source_authority": "source-owner",
+        "ci_authority": "ci-owner",
+        "security_authority": "",
+        "source_prefix": SOURCE,
+        "ci_prefix": CI,
+        "security_prefix": "",
+        "security_attestation_mode": OPTIONAL,
+        "current_version": "1.0.0",
+        "current_source_url": PARENT_URL,
+        "current_code_hash": sha256_hex(PARENT),
+        "max_age": 86_400,
+        "proposal_ttl": 3_600,
+        "execution_timeout": 3_600,
+    }
+
+
+def registration_pair() -> tuple[SentinelXV2Model, SentinelXV2TargetModel]:
+    governor = SentinelXV2Model(NOW)
+    target = SentinelXV2TargetModel(governor, TARGET, OWNER)
+    return governor, target
+
+
+def test_async_registration_parent_finalized_child_failure_is_retryable():
+    governor, target = registration_pair()
+    target.register_with_sentinelx(caller=OWNER, **registration_args())
+    assert not governor.is_target_registered(TARGET)
+    assert not target.is_registered_with_sentinelx()
+    assert target.finalize_registration_child(success=False) is False
+    assert not governor.is_target_registered(TARGET)
+    assert not target.is_registered_with_sentinelx()
+
+
+def test_async_registration_child_success_makes_governor_authoritative():
+    governor, target = registration_pair()
+    target.register_with_sentinelx(caller=OWNER, **registration_args())
+    assert target.finalize_registration_child(success=True) is True
+    assert governor.is_target_registered(TARGET)
+    assert target.is_registered_with_sentinelx()
+
+
+def test_governor_already_registered_blocks_duplicate_before_emit():
+    governor, target = registration_pair()
+    target.register_with_sentinelx(caller=OWNER, **registration_args())
+    target.finalize_registration_child(success=True)
+    with pytest.raises(SentinelXError, match="already finalized"):
+        target.register_with_sentinelx(caller=OWNER, **registration_args())
+    assert target._pending_registration is None
+
+
+def test_async_registration_failed_child_then_retry_succeeds():
+    governor, target = registration_pair()
+    target.register_with_sentinelx(caller=OWNER, **registration_args())
+    with pytest.raises(SentinelXError, match="immutable"):
+        target.finalize_registration_child(
+            success=True, overrides={"current_code_hash": "not-a-sha256"}
+        )
+    assert not governor.is_target_registered(TARGET)
+    assert not target.is_registered_with_sentinelx()
+    target.register_with_sentinelx(caller=OWNER, **registration_args())
+    assert target.finalize_registration_child(success=True) is True
+    assert target.is_registered_with_sentinelx()
+
+
+def test_governor_policy_is_source_of_truth_not_legacy_target_flag():
+    governor, target = registration_pair()
+    target.registered_with_sentinelx = True
+    assert target.is_registered_with_sentinelx() is False
+    governor.register_target(**{**registration_args(), "target": TARGET, "owner": OWNER}, caller=TARGET)
+    assert target.is_registered_with_sentinelx() is True
+
+
 def prepared(*, mode: str = OPTIONAL, security: bool = False):
     model = SentinelXV2Model(NOW)
     if mode == OPTIONAL:
@@ -132,6 +208,14 @@ def test_optional_policy_accepts_empty_external_security_fields():
     model = SentinelXV2Model(NOW)
     register(model, security_authority="", security_prefix="")
     assert model.policies[TARGET].security_attestation_mode == OPTIONAL
+
+
+def test_optional_wire_zero_is_normalized_to_explicit_security_absence():
+    model = SentinelXV2Model(NOW)
+    register(model, security_authority=0, security_prefix=0)
+    policy = model.policies[TARGET]
+    assert policy.security_authority == ""
+    assert policy.security_prefix == ""
 
 
 def test_optional_proposal_reaches_evidence_ready_without_security_artifact():

@@ -18,7 +18,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 RPC = "https://studio-dev.genlayer.com/api"
 CHAIN_ID = 61997
-MANIFEST = ROOT / "deployments" / "v2" / "SOURCE_MANIFEST.json"
+MANIFEST = ROOT / "deployments" / "v2.1" / "SOURCE_MANIFEST.json"
 JOURNAL = ROOT / "artifacts" / "studio-dev-v2-canonical-transactions.json"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))

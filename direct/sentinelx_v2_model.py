@@ -133,8 +133,8 @@ class SentinelXV2Model:
 
     def register_target(
         self, *, target: str, owner: str, project_name: str, constitution: str,
-        source_authority: str, ci_authority: str, security_authority: str,
-        source_prefix: str, ci_prefix: str, security_prefix: str,
+        source_authority: str, ci_authority: str, security_authority: str | int,
+        source_prefix: str, ci_prefix: str, security_prefix: str | int,
         security_attestation_mode: str = OPTIONAL,
         current_version: str = "1.0.0", current_source_url: str,
         current_code_hash: str, max_age: int = 86_400,
@@ -149,6 +149,10 @@ class SentinelXV2Model:
             raise SentinelXError("Target is invalid")
         if not owner.startswith("0x") or len(owner) != 42:
             raise SentinelXError("Owner is invalid")
+        # GenVM v0.6 encodes an absent optional internal string as integer
+        # zero. Treat that wire representation as explicit absence.
+        security_authority = str(security_authority) if security_authority else ""
+        security_prefix = str(security_prefix) if security_prefix else ""
         if security_attestation_mode not in (OPTIONAL, REQUIRED_INDEPENDENT):
             raise SentinelXError("Security attestation mode is invalid")
         if source_authority == ci_authority:
@@ -188,6 +192,10 @@ class SentinelXV2Model:
         self.policies[target] = policy
         self.active[target] = 0
         return policy
+
+    def is_target_registered(self, target: str) -> bool:
+        """The governor policy is the only registration authority."""
+        return target in self.policies
 
     def create_proposal(
         self, *, target: str, candidate_version: str, candidate_source_url: str,
@@ -494,3 +502,42 @@ class SentinelXV2Model:
         proposal.status = EXECUTION_FAILED
         self.active[proposal.target] = 0
         return proposal.status
+
+
+class SentinelXV2TargetModel:
+    """Model the asynchronous target-to-governor registration boundary."""
+
+    def __init__(self, governor: SentinelXV2Model, target: str, owner: str):
+        self.governor = governor
+        self.target = target
+        self.owner = owner
+        self.registered_with_sentinelx = False
+        self._pending_registration: dict[str, Any] | None = None
+
+    def is_registered_with_sentinelx(self) -> bool:
+        return self.governor.is_target_registered(self.target)
+
+    def register_with_sentinelx(self, *, caller: str, **registration: Any) -> dict[str, Any]:
+        if caller != self.owner:
+            raise SentinelXError("Only the protected application owner may call this method")
+        if self.governor.is_target_registered(self.target):
+            raise SentinelXError("Policy registration is already finalized")
+        request = dict(registration)
+        request["target"] = self.target
+        request["owner"] = self.owner
+        self._pending_registration = request
+        return dict(request)
+
+    def finalize_registration_child(
+        self, *, success: bool, overrides: dict[str, Any] | None = None
+    ) -> bool:
+        if self._pending_registration is None:
+            raise SentinelXError("No registration child is pending")
+        request = dict(self._pending_registration)
+        self._pending_registration = None
+        if not success:
+            return False
+        if overrides:
+            request.update(overrides)
+        self.governor.register_target(**request, caller=self.target)
+        return True

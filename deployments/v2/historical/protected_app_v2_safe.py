@@ -11,8 +11,6 @@ TARGET_SCHEMA_VERSION = "sentinelx-target-v2"
 @gl.contract.interface
 class SentinelXGovernorInterface:
     class View:
-        def is_target_registered(self, target: str) -> bool: ...
-
         def is_upgrade_authorized(
             self, proposal_id: u256, target: str, candidate_hash: str
         ) -> bool: ...
@@ -45,13 +43,11 @@ class SentinelXGovernorInterface:
 
 
 class ProtectedApplication(gl.contract.Contract):
-    """SentinelX V2 baseline target with a V1-compatible storage prefix.
+    """Safe v2 candidate with an append-only storage extension.
 
-    These fields are the historical V1 persistent layout reused as the V2
-    baseline. No migration is required because V2 has not been deployed. The owner is a normal product
-    administrator and is deliberately never added to Root.upgraders. Only the
-    governor address is able to reach install_reviewed_upgrade through the
-    GenVM code replacement capability.
+    The first eight fields exactly preserve protected_app_v1.py. The final
+    `release_note` field is appended and starts empty on an existing v1 state.
+    All owner rights and the SentinelX-only upgrade path remain unchanged.
     """
 
     owner: Address
@@ -62,6 +58,7 @@ class ProtectedApplication(gl.contract.Contract):
     installed_proposal_id: u256
     installed_candidate_hash: str
     registered_with_sentinelx: bool
+    release_note: str
 
     def __init__(
         self,
@@ -69,6 +66,8 @@ class ProtectedApplication(gl.contract.Contract):
         application_name: str,
         initial_value: str,
     ):
+        # Existing state is retained during a code-only upgrade. These
+        # assignments are constructor documentation for fresh deployments.
         self.owner = gl.message.sender_address
         self.sentinelx_governor = sentinelx_governor
         self.application_name = application_name
@@ -77,11 +76,7 @@ class ProtectedApplication(gl.contract.Contract):
         self.installed_proposal_id = 0
         self.installed_candidate_hash = ""
         self.registered_with_sentinelx = False
-
-        # The owner is not an upgrader. Root's locked upgrade list contains
-        # only SentinelX, and remains persistent across compatible upgrades.
-        root = gl.storage.Root.get()
-        root.upgraders.get().append(sentinelx_governor)
+        self.release_note = ""
 
     def _only_owner(self) -> None:
         if gl.message.sender_address != self.owner:
@@ -106,6 +101,19 @@ class ProtectedApplication(gl.contract.Contract):
         return self.application_name
 
     @gl.public.view
+    def get_release_note(self) -> str:
+        return self.release_note
+
+    @gl.public.view
+    def get_release_note_length(self) -> int:
+        return len(self.release_note)
+
+    @gl.public.write
+    def set_release_note(self, note: str) -> None:
+        self._only_owner()
+        self.release_note = note
+
+    @gl.public.view
     def get_owner(self) -> Address:
         return self.owner
 
@@ -123,9 +131,7 @@ class ProtectedApplication(gl.contract.Contract):
 
     @gl.public.view
     def is_registered_with_sentinelx(self) -> bool:
-        return SentinelXGovernorInterface(self.sentinelx_governor).view().is_target_registered(
-            str(gl.message.contract_address)
-        )
+        return self.registered_with_sentinelx
 
     @gl.public.write
     def register_with_sentinelx(
@@ -147,10 +153,9 @@ class ProtectedApplication(gl.contract.Contract):
         execution_timeout_seconds: int,
     ) -> None:
         self._only_owner()
-        if SentinelXGovernorInterface(self.sentinelx_governor).view().is_target_registered(
-            str(gl.message.contract_address)
-        ):
-            raise gl.vm.UserError("Policy registration is already finalized")
+        if self.registered_with_sentinelx:
+            raise gl.vm.UserError("Policy registration is one-time")
+        self.registered_with_sentinelx = True
         SentinelXGovernorInterface(self.sentinelx_governor).emit(on="finalized").register_target(
             str(gl.message.contract_address),
             str(self.owner),
@@ -173,13 +178,6 @@ class ProtectedApplication(gl.contract.Contract):
 
     @gl.public.write
     def install_reviewed_upgrade(self, proposal_id: u256, candidate_hash: str) -> None:
-        """Contract-to-contract-only installation entry point.
-
-        The caller, live governor authorization, stored proposal bytes, and
-        candidate hash are all checked immediately before replacing Root.code.
-        The attestation is written before replacement and the confirmation is
-        emitted only at finalized state.
-        """
         if gl.message.sender_address != self.sentinelx_governor:
             raise gl.vm.UserError("Only SentinelX may install an upgrade")
         normalized_hash = candidate_hash.lower()
@@ -192,18 +190,14 @@ class ProtectedApplication(gl.contract.Contract):
             raise gl.vm.UserError("Live SentinelX authorization is absent or expired")
         if self.installed_proposal_id == proposal_id:
             raise gl.vm.UserError("Proposal was already installed")
-
         candidate_code = governor.view().get_candidate_code(proposal_id)
         actual_hash = hashlib.sha256(candidate_code).hexdigest()
         if actual_hash != normalized_hash:
             raise gl.vm.UserError("Candidate bytes do not match candidate hash")
-
         self.installed_proposal_id = proposal_id
         self.installed_candidate_hash = actual_hash
-
         root = gl.storage.Root.get()
         code = root.code.get()
         code.truncate()
         code.extend(candidate_code)
-
         governor.emit(on="finalized").confirm_install(proposal_id, actual_hash)

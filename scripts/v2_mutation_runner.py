@@ -33,10 +33,10 @@ TARGET = ROOT / "contracts" / "protected_app_v1.py"
 ORACLE = ROOT / "direct" / "sentinelx_v2_model.py"
 ORACLE_BASE = ROOT / "direct" / "sentinelx_model.py"
 FROZEN_HASHES = {
-    GOVERNOR: "174d64b3bca21ead43f36dff38ccb1ac13aafd77282a6821339bcd1f41394db2",
-    ROOT / "contracts" / "protected_app_v1.py": "beb27e7909b788549ae086ad105b2091477a724c645728eef26b10408d9e36dc",
-    ROOT / "contracts" / "protected_app_v2_safe.py": "a5fce03687757b2019ca8bd5c44a87cdea0c0179fd3efc087afe568250e5385a",
-    ROOT / "contracts" / "protected_app_v2_unsafe.py": "0f5d99fc3830d9291ff60dafac501f87c830f56cfdf68aceedc2774595cc1158",
+    GOVERNOR: "2aa37e0d070e2feee00a10f6554da7a0ace3c1c21491fcfce93dd6c450065ecf",
+    ROOT / "contracts" / "protected_app_v1.py": "470c9a72c63f8ca345956299edc530bc92924eaa1708c05a767b141df05d1c4f",
+    ROOT / "contracts" / "protected_app_v2_safe.py": "72c240f0725dc314429d01f051d4b40dc906623f48ba2b38514824d7f46011e5",
+    ROOT / "contracts" / "protected_app_v2_unsafe.py": "6b3f7a0ebae0f097036f33b57b77b1d10ae2d813b7330e34ba1dab33a5010653",
 }
 
 TARGET_ADDRESS = "0x" + "1" * 40
@@ -457,6 +457,62 @@ def probe_post_verified_mutation(module: ModuleType) -> None:
     ), "post-VERIFIED proposal mutation")
 
 
+def _registration_args(module: ModuleType) -> dict[str, object]:
+    return {
+        "project_name": "Mutation target", "constitution": _constitution(),
+        "source_authority": "source-authority", "ci_authority": "ci-authority",
+        "security_authority": "", "source_prefix": SOURCE_PREFIX,
+        "ci_prefix": CI_PREFIX, "security_prefix": "",
+        "security_attestation_mode": module.OPTIONAL, "current_version": "1.0.0",
+        "current_source_url": SOURCE_PREFIX + "a" * 40 + "/protected_app_v1.py",
+        "current_code_hash": module.sha256_hex(PARENT), "max_age": 86_400,
+        "proposal_ttl": 3_600, "execution_timeout": 3_600,
+    }
+
+
+def probe_no_early_registration_flag(module: ModuleType) -> None:
+    governor = module.SentinelXV2Model(NOW)
+    target = module.SentinelXV2TargetModel(governor, TARGET_ADDRESS, OWNER_ADDRESS)
+    target.register_with_sentinelx(caller=OWNER_ADDRESS, **_registration_args(module))
+    if target.registered_with_sentinelx:
+        raise AssertionError("registration flag was written before child finality")
+    if governor.is_target_registered(TARGET_ADDRESS):
+        raise AssertionError("failed registration created a governor policy")
+
+
+def probe_local_flag_authority(module: ModuleType) -> None:
+    governor = module.SentinelXV2Model(NOW)
+    target = module.SentinelXV2TargetModel(governor, TARGET_ADDRESS, OWNER_ADDRESS)
+    target.registered_with_sentinelx = True
+    target.register_with_sentinelx(caller=OWNER_ADDRESS, **_registration_args(module))
+
+
+def probe_retry_after_registration_failure(module: ModuleType) -> None:
+    governor = module.SentinelXV2Model(NOW)
+    target = module.SentinelXV2TargetModel(governor, TARGET_ADDRESS, OWNER_ADDRESS)
+    args = _registration_args(module)
+    target.register_with_sentinelx(caller=OWNER_ADDRESS, **args)
+    if target.finalize_registration_child(success=False):
+        raise AssertionError("failed registration child unexpectedly succeeded")
+    target.register_with_sentinelx(caller=OWNER_ADDRESS, **args)
+
+
+def probe_derived_registration(module: ModuleType) -> None:
+    governor = module.SentinelXV2Model(NOW)
+    target = module.SentinelXV2TargetModel(governor, TARGET_ADDRESS, OWNER_ADDRESS)
+    target.registered_with_sentinelx = True
+    if target.is_registered_with_sentinelx():
+        raise AssertionError("legacy target flag falsely reported registration")
+
+
+def probe_duplicate_policy_registration(module: ModuleType) -> None:
+    model = module.SentinelXV2Model(NOW)
+    args = _registration_args(module)
+    args.update({"target": TARGET_ADDRESS, "owner": OWNER_ADDRESS, "caller": TARGET_ADDRESS})
+    model.register_target(**args)
+    _expect_error(lambda: model.register_target(**args), "duplicate governor policy")
+
+
 def _ast_gate(path: Path, assertion: Callable[[dict[str, str]], None]) -> None:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     functions: dict[str, str] = {}
@@ -592,6 +648,34 @@ def gate_post_verified(functions: dict[str, str]) -> None:
     assert "STATUS_VERIFIED" not in body
 
 
+def gate_registration_no_early_flag(functions: dict[str, str]) -> None:
+    assert "self.registered_with_sentinelx = True" not in functions["register_with_sentinelx"]
+
+
+def gate_governor_registration_view(functions: dict[str, str]) -> None:
+    body = functions["register_with_sentinelx"]
+    assert "is_target_registered" in body
+    assert "self.registered_with_sentinelx" not in body
+
+
+def gate_derived_registration(functions: dict[str, str]) -> None:
+    body = functions["is_registered_with_sentinelx"]
+    assert "is_target_registered" in body
+    assert "return self.registered_with_sentinelx" not in body
+
+
+def gate_target_owner_view(functions: dict[str, str]) -> None:
+    assert "target_view.get_owner() != owner_address" in functions["register_target"]
+
+
+def gate_target_governor_view(functions: dict[str, str]) -> None:
+    assert "target_view.get_upgrade_governor() != gl.message.contract_address" in functions["register_target"]
+
+
+def gate_duplicate_policy(functions: dict[str, str]) -> None:
+    assert "target_address in self.policies" in functions["register_target"]
+
+
 def _mutations() -> tuple[Mutation, ...]:
     governor = GOVERNOR
     target = TARGET
@@ -718,6 +802,45 @@ def _mutations() -> tuple[Mutation, ...]:
             '        if proposal.status not in (STATUS_EVIDENCE_REPAIR_REQUIRED, STATUS_EVIDENCE_RETRY_REQUIRED, STATUS_REVIEW_RETRY_REQUIRED, STATUS_VERIFIED):\n', "post verified mutation"), _source(
             '        if caller != policy.owner or proposal.status not in (REPAIR, RETRY, EVIDENCE_RETRY):\n',
             '        if caller != policy.owner or proposal.status not in (REPAIR, RETRY, EVIDENCE_RETRY, VERIFIED):\n', "post verified mutation oracle"), probe_post_verified_mutation, gate_post_verified),
+        Mutation(29, "set target registered flag before child succeeds", target, _source(
+            '        SentinelXGovernorInterface(self.sentinelx_governor).emit(on="finalized").register_target(\n',
+            '        self.registered_with_sentinelx = True\n        SentinelXGovernorInterface(self.sentinelx_governor).emit(on="finalized").register_target(\n',
+            "registration early flag"), _source(
+            '        self._pending_registration = request\n',
+            '        self.registered_with_sentinelx = True\n        self._pending_registration = request\n',
+            "registration early flag oracle"), probe_no_early_registration_flag, gate_registration_no_early_flag),
+        Mutation(30, "trust local registration flag instead of governor", target, _source(
+            '        if SentinelXGovernorInterface(self.sentinelx_governor).view().is_target_registered(\n            str(gl.message.contract_address)\n        ):\n',
+            '        if self.registered_with_sentinelx:\n', "registration authority"), _source(
+            '        if self.governor.is_target_registered(self.target):\n',
+            '        if self.registered_with_sentinelx:\n', "registration authority oracle"), probe_local_flag_authority, gate_governor_registration_view),
+        Mutation(31, "block retry after failed registration child", target, _source_many([
+            ('        if SentinelXGovernorInterface(self.sentinelx_governor).view().is_target_registered(\n            str(gl.message.contract_address)\n        ):\n',
+             '        if self.registered_with_sentinelx or SentinelXGovernorInterface(self.sentinelx_governor).view().is_target_registered(\n            str(gl.message.contract_address)\n        ):\n', "registration retry guard"),
+            ('        SentinelXGovernorInterface(self.sentinelx_governor).emit(on="finalized").register_target(\n',
+             '        self.registered_with_sentinelx = True\n        SentinelXGovernorInterface(self.sentinelx_governor).emit(on="finalized").register_target(\n', "registration retry flag"),
+        ]), _source_many([
+            ('        if self.governor.is_target_registered(self.target):\n',
+             '        if self.registered_with_sentinelx or self.governor.is_target_registered(self.target):\n', "registration retry guard oracle"),
+            ('        self._pending_registration = request\n',
+             '        self.registered_with_sentinelx = True\n        self._pending_registration = request\n', "registration retry flag oracle"),
+        ]), probe_retry_after_registration_failure, gate_governor_registration_view),
+        Mutation(32, "target derived registration returns true without governor policy", target, _source(
+            '        return SentinelXGovernorInterface(self.sentinelx_governor).view().is_target_registered(\n            str(gl.message.contract_address)\n        )\n',
+            '        return self.registered_with_sentinelx\n', "derived registration"), _source(
+            '        return self.governor.is_target_registered(self.target)\n',
+            '        return self.registered_with_sentinelx\n', "derived registration oracle"), probe_derived_registration, gate_derived_registration),
+        Mutation(33, "remove governor target owner verification", governor, _source(
+            '        if target_view.get_owner() != owner_address:\n            raise gl.vm.UserError("Registration owner does not match the target owner")\n',
+            '        if False:\n            raise gl.vm.UserError("Registration owner does not match the target owner")\n', "target owner verification"), no_model, None, gate_target_owner_view),
+        Mutation(34, "remove governor target-governor verification", governor, _source(
+            '        if target_view.get_upgrade_governor() != gl.message.contract_address:\n            raise gl.vm.UserError("Target is not configured for this SentinelX governor")\n',
+            '        if False:\n            raise gl.vm.UserError("Target is not configured for this SentinelX governor")\n', "target governor verification"), no_model, None, gate_target_governor_view),
+        Mutation(35, "allow duplicate governor policy registration", governor, _source(
+            '        if target_address in self.policies:\n            raise gl.vm.UserError("Target policy is immutable and already registered")\n',
+            '        if False:\n            raise gl.vm.UserError("Target policy is immutable and already registered")\n', "duplicate policy"), _source(
+            '        if target in self.policies:\n            raise SentinelXError("Target policy is immutable")\n',
+            '        if False:\n            raise SentinelXError("Target policy is immutable")\n', "duplicate policy oracle"), probe_duplicate_policy_registration, gate_duplicate_policy),
     )
 
 

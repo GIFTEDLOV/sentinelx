@@ -11,6 +11,8 @@ TARGET_SCHEMA_VERSION = "sentinelx-target-v2"
 @gl.contract.interface
 class SentinelXGovernorInterface:
     class View:
+        def is_target_registered(self, target: str) -> bool: ...
+
         def is_upgrade_authorized(
             self, proposal_id: u256, target: str, candidate_hash: str
         ) -> bool: ...
@@ -131,7 +133,9 @@ class ProtectedApplication(gl.contract.Contract):
 
     @gl.public.view
     def is_registered_with_sentinelx(self) -> bool:
-        return self.registered_with_sentinelx
+        return SentinelXGovernorInterface(self.sentinelx_governor).view().is_target_registered(
+            str(gl.message.contract_address)
+        )
 
     @gl.public.write
     def register_with_sentinelx(
@@ -153,9 +157,10 @@ class ProtectedApplication(gl.contract.Contract):
         execution_timeout_seconds: int,
     ) -> None:
         self._only_owner()
-        if self.registered_with_sentinelx:
-            raise gl.vm.UserError("Policy registration is one-time")
-        self.registered_with_sentinelx = True
+        if SentinelXGovernorInterface(self.sentinelx_governor).view().is_target_registered(
+            str(gl.message.contract_address)
+        ):
+            raise gl.vm.UserError("Policy registration is already finalized")
         SentinelXGovernorInterface(self.sentinelx_governor).emit(on="finalized").register_target(
             str(gl.message.contract_address),
             str(self.owner),

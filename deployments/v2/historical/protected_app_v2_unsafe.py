@@ -11,8 +11,6 @@ TARGET_SCHEMA_VERSION = "sentinelx-target-v2"
 @gl.contract.interface
 class SentinelXGovernorInterface:
     class View:
-        def is_target_registered(self, target: str) -> bool: ...
-
         def is_upgrade_authorized(
             self, proposal_id: u256, target: str, candidate_hash: str
         ) -> bool: ...
@@ -99,12 +97,6 @@ class ProtectedApplication(gl.contract.Contract):
     @gl.public.view
     def get_upgrade_governor(self) -> Address:
         return self.sentinelx_governor
-
-    @gl.public.view
-    def is_registered_with_sentinelx(self) -> bool:
-        return SentinelXGovernorInterface(self.sentinelx_governor).view().is_target_registered(
-            str(gl.message.contract_address)
-        )
 
     @gl.public.view
     def get_installed_proposal_id(self) -> u256:

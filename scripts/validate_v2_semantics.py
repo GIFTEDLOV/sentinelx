@@ -1,4 +1,4 @@
-"""Run isolated GenVM v0.6 semantic validation for the frozen V2 sources.
+"""Run isolated GenVM v0.6 semantic validation for the frozen V2.1 sources.
 
 The repository freezes the static linter at 0.11.0 and the semantic RC at
 0.11.1rc2.  They are separate gates: the former is used by ``preflight.py``;
@@ -31,10 +31,10 @@ CONTRACTS = (
     ROOT / "contracts" / "protected_app_v2_unsafe.py",
 )
 FROZEN_HASHES = {
-    "sentinelx_governor.py": "174d64b3bca21ead43f36dff38ccb1ac13aafd77282a6821339bcd1f41394db2",
-    "protected_app_v1.py": "beb27e7909b788549ae086ad105b2091477a724c645728eef26b10408d9e36dc",
-    "protected_app_v2_safe.py": "a5fce03687757b2019ca8bd5c44a87cdea0c0179fd3efc087afe568250e5385a",
-    "protected_app_v2_unsafe.py": "0f5d99fc3830d9291ff60dafac501f87c830f56cfdf68aceedc2774595cc1158",
+    "sentinelx_governor.py": "2aa37e0d070e2feee00a10f6554da7a0ace3c1c21491fcfce93dd6c450065ecf",
+    "protected_app_v1.py": "470c9a72c63f8ca345956299edc530bc92924eaa1708c05a767b141df05d1c4f",
+    "protected_app_v2_safe.py": "72c240f0725dc314429d01f051d4b40dc906623f48ba2b38514824d7f46011e5",
+    "protected_app_v2_unsafe.py": "6b3f7a0ebae0f097036f33b57b77b1d10ae2d813b7330e34ba1dab33a5010653",
 }
 
 

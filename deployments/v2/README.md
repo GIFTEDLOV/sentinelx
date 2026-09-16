@@ -1,13 +1,9 @@
-# SentinelX V2 deployment candidate
+# SentinelX V2 failed profile evidence
 
-`SOURCE_MANIFEST.json` is the frozen source gate for the first canonical
-SentinelX deployment candidate. It binds the four contract paths, exact byte
-counts and SHA-256 hashes to Studio-dev chain `61997` and the documented RC
-toolchain family.
+This directory records the non-canonical V2 candidate that was superseded by
+V2.1 after live registration exposed an asynchronous state-machine defect.
+The original source files, source manifest, deployment-readiness record, and
+fee coverage are under `historical/`.
 
-No canonical deployment has occurred. `scripts/studio_dev_v2_deploy.py` is
-read-only by default and its broadcast path is intentionally operator-gated.
-Before a future deployment it must recompute every source byte, require the
-manifest/network match, estimate fees freshly, persist the returned hash before
-polling, and prove `Finalized` + `FINISHED_WITH_RETURN`, contract-info schema,
-and deployed source parity.
+No canonical deployment has occurred. The corrected candidate is documented
+under `deployments/v2.1/`.

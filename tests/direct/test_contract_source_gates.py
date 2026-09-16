@@ -115,3 +115,34 @@ def test_v2_target_registration_interfaces_include_attestation_mode():
         text = (CONTRACT_DIR / name).read_text(encoding="utf-8")
         assert "security_attestation_mode: str" in text
         assert "security_attestation_mode," in text
+
+
+def test_registration_interface_and_emit_argument_order_is_exact():
+    module = parsed("protected_app_v1.py")
+    interface = next(node for node in module.body
+                     if isinstance(node, ast.ClassDef) and node.name == "SentinelXGovernorInterface")
+    write = next(node for node in interface.body
+                 if isinstance(node, ast.ClassDef) and node.name == "Write")
+    register_interface = next(node for node in write.body
+                              if isinstance(node, ast.FunctionDef) and node.name == "register_target")
+    assert [arg.arg for arg in register_interface.args.args[1:]] == [
+        "target", "owner", "project_name", "release_constitution", "source_authority",
+        "ci_authority", "security_attestation_mode", "security_authority", "source_prefix",
+        "ci_prefix", "security_prefix", "current_version", "current_source_url",
+        "current_code_hash", "max_evidence_age_seconds", "proposal_ttl_seconds",
+        "execution_timeout_seconds",
+    ]
+    target = next(node for node in module.body
+                  if isinstance(node, ast.ClassDef) and node.name == "ProtectedApplication")
+    registration = next(node for node in target.body
+                        if isinstance(node, ast.FunctionDef) and node.name == "register_with_sentinelx")
+    emit = next(node for node in ast.walk(registration)
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "register_target")
+    assert [ast.unparse(arg) for arg in emit.args] == [
+        "str(gl.message.contract_address)", "str(self.owner)", "project_name",
+        "release_constitution", "source_authority", "ci_authority",
+        "security_attestation_mode", "security_authority", "source_prefix", "ci_prefix",
+        "security_prefix", "current_version", "current_source_url", "current_code_hash",
+        "max_evidence_age_seconds", "proposal_ttl_seconds", "execution_timeout_seconds",
+    ]

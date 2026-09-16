@@ -1,4 +1,4 @@
-"""Build and verify the frozen SentinelX V2 source manifest."""
+"""Build and verify the frozen SentinelX V2.1 source manifest."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_PATH = ROOT / "deployments" / "v2" / "SOURCE_MANIFEST.json"
+MANIFEST_PATH = ROOT / "deployments" / "v2.1" / "SOURCE_MANIFEST.json"
 CONTRACT_PATHS = (
     "contracts/sentinelx_governor.py",
     "contracts/protected_app_v1.py",
@@ -30,9 +30,9 @@ def _source_record(relative_path: str) -> dict[str, Any]:
 
 def build_manifest() -> dict[str, Any]:
     return {
-        "schema": "sentinelx-v2-source-manifest-v1",
-        "contract_version": "SentinelX V2",
-        "source_lineage": "SentinelX V1 historical pre-canonical source -> V2 first-canonical candidate",
+        "schema": "sentinelx-v2.1-source-manifest-v1",
+        "contract_version": "SentinelX V2.1",
+        "source_lineage": "SentinelX V2 failed disposable registration profile -> V2.1 corrected first-canonical candidate",
         "network": "studio-dev",
         "rpc": "https://studio-dev.genlayer.com/api",
         "chain_id": 61997,
@@ -52,7 +52,7 @@ def build_manifest() -> dict[str, Any]:
 def verify_manifest(manifest: dict[str, Any] | None = None) -> list[str]:
     value = manifest if manifest is not None else json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     errors: list[str] = []
-    if value.get("schema") != "sentinelx-v2-source-manifest-v1":
+    if value.get("schema") != "sentinelx-v2.1-source-manifest-v1":
         errors.append("manifest schema mismatch")
     if value.get("network") != "studio-dev" or value.get("chain_id") != 61997:
         errors.append("manifest network mismatch")
@@ -75,4 +75,7 @@ def verify_manifest(manifest: dict[str, Any] | None = None) -> list[str]:
 
 
 if __name__ == "__main__":
-    print(json.dumps(build_manifest(), indent=2, sort_keys=True))
+    MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    manifest = build_manifest()
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+    print(json.dumps(manifest, indent=2, sort_keys=True))
