@@ -436,7 +436,7 @@ def main() -> int:
         "chain_id": CHAIN_ID,
         "profile_only": True,
         "source_revision": SOURCE_REVISION,
-        "repository_head_at_first_write": "5efe4d5fa907a672e39c986a19f772ceabb8940b",
+        "repository_head_at_first_write": SOURCE_REVISION,
         "source_manifest_sha256": hashlib.sha256(SOURCE_MANIFEST.read_bytes()).hexdigest(),
         "deployer": EXPECTED_DEPLOYER,
         "balance_before": preflight["balance_wei"],

@@ -205,9 +205,9 @@ def _cli_command(command: list[str]) -> list[str]:
     try:
         args_index = command.index("--args")
     except ValueError:
-        return command
+        args_index = -1
     json_object_args: list[str] = []
-    for value in command[args_index + 1 :]:
+    for value in command[args_index + 1 :] if args_index >= 0 else []:
         if not value.startswith("{"):
             continue
         try:
@@ -216,9 +216,6 @@ def _cli_command(command: list[str]) -> list[str]:
             continue
         if isinstance(parsed, dict):
             json_object_args.append(value)
-    if not json_object_args:
-        return command
-
     node = shutil.which("node")
     if not node:
         raise RuntimeError("Node.js is required for the managed CLI argument bridge")
@@ -234,6 +231,26 @@ def _cli_command(command: list[str]) -> list[str]:
         "JSON.parse = (value, ...rest) => forced.has(value)"
         " ? (() => { throw new Error('sentinelx-exact-string-arg'); })()"
         " : originalParse(value, ...rest);"
+        # Capture the hash at the managed CLI's eth_sendRawTransaction
+        # response boundary.  The CLI itself waits for a receipt before it
+        # prints its ordinary label, so a later wait error must not lose the
+        # already-broadcast hash.  Only the public hash is emitted; request
+        # bodies and signing material are never logged.
+        "const originalFetch = globalThis.fetch;"
+        "globalThis.fetch = async (...args) => {"
+        " let rpcMethod = null;"
+        " try { const body = args[1]?.body;"
+        "   if (typeof body === 'string') rpcMethod = originalParse(body)?.method ?? null;"
+        " } catch (_) {}"
+        " const response = await originalFetch(...args);"
+        " if (rpcMethod === 'eth_sendRawTransaction') {"
+        "   try { const value = (await response.clone().json())?.result;"
+        "     if (typeof value === 'string' && /^0x[0-9a-fA-F]{64}$/.test(value))"
+        "       process.stdout.write('SENTINELX_MANAGED_TRANSACTION_HASH ' + value + '\\n');"
+        "   } catch (_) {}"
+        " }"
+        " return response;"
+        "};"
         # `node -e` omits the script path from argv; the CLI expects the
         # ordinary `[node, script, command, ...]` layout.
         "process.argv = [process.argv[0], 'genlayer', ...process.argv.slice(1)];"
@@ -264,8 +281,13 @@ def _run_cli(
     assert process.stdout is not None
     for line in process.stdout:
         clean = ANSI_RE.sub("", line)
-        if found is None and pattern is not None:
-            match = pattern.search(clean)
+        if found is None:
+            managed_match = re.search(
+                r"SENTINELX_MANAGED_TRANSACTION_HASH[^0-9a-fA-F]*(0x[0-9a-fA-F]{64})",
+                clean,
+                re.IGNORECASE,
+            )
+            match = managed_match or (pattern.search(clean) if pattern is not None else None)
             if match:
                 found = _hash_text(match.group(1))
                 if on_hash is not None:
