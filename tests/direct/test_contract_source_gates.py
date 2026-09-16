@@ -93,6 +93,14 @@ def test_v2_policy_and_snapshot_storage_are_explicitly_bound():
     assert "evidence_snapshots: TreeMap[str, EvidenceSnapshotRecord]" in text
 
 
+def test_v21_per_target_indexes_use_runtime_supported_scalar_storage():
+    text = (CONTRACT_DIR / "sentinelx_governor.py").read_text(encoding="utf-8")
+    assert "proposals_by_target: TreeMap[Address, str]" in text
+    assert "release_history_by_target: TreeMap[Address, str]" in text
+    assert "TreeMap[Address, DynArray[u256]]" not in text
+    assert "DynArray[u256]()" not in text
+
+
 def test_v2_capture_can_fetch_but_review_path_has_no_web_fetch_call():
     module = parsed("sentinelx_governor.py")
     functions = {

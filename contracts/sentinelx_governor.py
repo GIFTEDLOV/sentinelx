@@ -197,8 +197,12 @@ class SentinelXGovernor(gl.contract.Contract):
     policies: TreeMap[Address, TargetPolicy]
     proposals: TreeMap[u256, ReleaseProposal]
     target_ids: DynArray[Address]
-    proposals_by_target: TreeMap[Address, DynArray[u256]]
-    release_history_by_target: TreeMap[Address, DynArray[u256]]
+    # GenVM v0.6 does not permit constructing a DynArray as a TreeMap value
+    # from contract code.  Keep these bounded per-target indexes in canonical
+    # JSON strings instead; the public views still expose decoded integer
+    # arrays, while all persistent writes use a supported scalar TreeMap value.
+    proposals_by_target: TreeMap[Address, str]
+    release_history_by_target: TreeMap[Address, str]
     active_proposal_by_target: TreeMap[Address, u256]
     used_evidence_ids: TreeMap[str, bool]
     installed_candidate_keys: TreeMap[str, bool]
@@ -387,6 +391,20 @@ class SentinelXGovernor(gl.contract.Contract):
 
     def _empty_proposal(self) -> u256:
         return 0
+
+    def _target_id_list(self, store: TreeMap[Address, str], target: Address) -> list:
+        encoded = store.get(target, "")
+        if not encoded:
+            return []
+        decoded = json.loads(encoded)
+        if not isinstance(decoded, list):
+            raise gl.vm.UserError("Target history storage is invalid")
+        return [int(value) for value in decoded]
+
+    def _append_target_id(self, store: TreeMap[Address, str], target: Address, value: u256) -> None:
+        values = self._target_id_list(store, target)
+        values.append(int(value))
+        store[target] = json.dumps(values, separators=(",", ":"))
 
     def _require_policy(self, target: Address) -> TargetPolicy:
         if target not in self.policies:
@@ -1225,8 +1243,8 @@ class SentinelXGovernor(gl.contract.Contract):
             active=True,
         )
         self.target_ids.append(target_address)
-        self.proposals_by_target[target_address] = DynArray[u256]()
-        self.release_history_by_target[target_address] = DynArray[u256]()
+        self.proposals_by_target[target_address] = "[]"
+        self.release_history_by_target[target_address] = "[]"
         self.active_proposal_by_target[target_address] = self._empty_proposal()
 
     # ------------------------------------------------------------------
@@ -1310,9 +1328,9 @@ class SentinelXGovernor(gl.contract.Contract):
         self.proposals[proposal_id] = proposal
         self.proposal_count = proposal_id
         self.active_proposal_by_target[target_address] = proposal_id
-        if len(self.proposals_by_target[target_address]) >= MAX_PROPOSALS_PER_TARGET:
+        if len(self._target_id_list(self.proposals_by_target, target_address)) >= MAX_PROPOSALS_PER_TARGET:
             raise gl.vm.UserError("Target proposal history capacity reached")
-        self.proposals_by_target[target_address].append(proposal_id)
+        self._append_target_id(self.proposals_by_target, target_address, proposal_id)
         return proposal_id
 
     @gl.public.write
@@ -1460,7 +1478,7 @@ class SentinelXGovernor(gl.contract.Contract):
         proposal.status = STATUS_VERIFIED
         proposal.last_review_code = review_code
         self.installed_candidate_keys[self._target_key(proposal.target, proposal.candidate_code_hash)] = True
-        self.release_history_by_target[proposal.target].append(proposal.proposal_id)
+        self._append_target_id(self.release_history_by_target, proposal.target, proposal.proposal_id)
         self._release_active(proposal.target, proposal.proposal_id)
 
     @gl.public.write
@@ -1584,10 +1602,10 @@ class SentinelXGovernor(gl.contract.Contract):
         return self.proposals[proposal_id].status
 
     @gl.public.view
-    def get_target_proposals(self, target: str) -> DynArray[u256]:
+    def get_target_proposals(self, target: str) -> list:
         if not self._is_address_text(target):
-            return DynArray[u256]()
-        return self.proposals_by_target.get(Address(target), DynArray[u256]())
+            return []
+        return self._target_id_list(self.proposals_by_target, Address(target))
 
     @gl.public.view
     def get_active_proposal(self, target: str) -> u256:
@@ -1596,10 +1614,10 @@ class SentinelXGovernor(gl.contract.Contract):
         return self.active_proposal_by_target.get(Address(target), self._empty_proposal())
 
     @gl.public.view
-    def get_release_history(self, target: str) -> DynArray[u256]:
+    def get_release_history(self, target: str) -> list:
         if not self._is_address_text(target):
-            return DynArray[u256]()
-        return self.release_history_by_target.get(Address(target), DynArray[u256]())
+            return []
+        return self._target_id_list(self.release_history_by_target, Address(target))
 
     @gl.public.view
     def get_policy_fingerprint(self, target: str) -> str:
