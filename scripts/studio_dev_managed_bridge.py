@@ -418,6 +418,15 @@ def _capture_cli_estimate(
     }
 
 
+def _retryable_studio_error(error: Exception) -> bool:
+    message = str(error)
+    return (
+        "Server busy: all" in message
+        or "Rate limit exceeded" in message
+        or "Too many requests" in message
+    )
+
+
 def _measured_review_message_allocation(
     *, client: Any, governor: str, proposal_id: int,
 ) -> dict[str, Any] | None:
@@ -471,12 +480,22 @@ def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]
 
     client = make_client()
     try:
-        estimate = _safe(client.estimate_transaction_fees_for_write(
-            address,
-            method,
-            account=SimpleNamespace(address=EXPECTED_DEPLOYER),
-            args=args,
-        ))
+        estimate = None
+        for attempt in range(8):
+            try:
+                estimate = _safe(client.estimate_transaction_fees_for_write(
+                    address,
+                    method,
+                    account=SimpleNamespace(address=EXPECTED_DEPLOYER),
+                    args=args,
+                ))
+                break
+            except Exception as error:
+                if not _retryable_studio_error(error) or attempt == 7:
+                    raise
+                time.sleep(10 if "Rate limit exceeded" in str(error) or "Too many requests" in str(error) else 5)
+        if not isinstance(estimate, dict):
+            raise RuntimeError("Studio fee estimator returned no object")
         if method == "capture_evidence":
             return _capture_cli_estimate(
                 client=client, address=address, args=args, estimate=estimate,
