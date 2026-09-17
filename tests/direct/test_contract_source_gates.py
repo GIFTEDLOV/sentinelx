@@ -77,7 +77,8 @@ def test_target_upgrade_path_checks_governor_sender_and_live_authorization():
 def test_v2_governor_declares_bounded_attestation_modes_and_snapshot_schema():
     text = (CONTRACT_DIR / "sentinelx_governor.py").read_text(encoding="utf-8")
     assert 'SCHEMA_VERSION = "sentinelx-governor-v2"' in text
-    assert 'SNAPSHOT_SCHEMA = "sentinelx-evidence-snapshot-v2"' in text
+    assert 'STAGED_EVIDENCE_SCHEMA = "sentinelx-staged-evidence-v2"' in text
+    assert 'SNAPSHOT_SCHEMA = "sentinelx-evidence-snapshot-v3"' in text
     assert 'SECURITY_OPTIONAL = "OPTIONAL"' in text
     assert 'SECURITY_REQUIRED_INDEPENDENT = "REQUIRED_INDEPENDENT"' in text
     assert 'STATUS_EVIDENCE_READY = "EVIDENCE_READY"' in text
@@ -89,6 +90,8 @@ def test_v2_policy_and_snapshot_storage_are_explicitly_bound():
     text = (CONTRACT_DIR / "sentinelx_governor.py").read_text(encoding="utf-8")
     assert "security_attestation_mode: str" in text
     assert "class EvidenceSnapshotRecord" in text
+    assert "class StagedEvidenceRecord" in text
+    assert "staged_evidence: TreeMap[str, StagedEvidenceRecord]" in text
     assert "snapshot_digest: str" in text
     assert "evidence_snapshots: TreeMap[str, EvidenceSnapshotRecord]" in text
 
@@ -129,6 +132,27 @@ def test_v2_capture_can_fetch_but_review_path_has_no_web_fetch_call():
     assert "gl.nondet.web.get" not in snapshot_review
     assert "_independent_snapshot_review" in review
     assert "review_web_fetch_counts[proposal_id] = 0" in review
+
+
+def test_v22_stages_bytes_and_only_returns_compact_capture_facts():
+    module = parsed("sentinelx_governor.py")
+    functions = {
+        node.name: node for node in ast.walk(module)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    stage = ast.unparse(functions["stage_evidence"])
+    capture_success = ast.unparse(functions["_capture_success"])
+    capture = ast.unparse(functions["capture_evidence"])
+    assert "gl.nondet.web.get" not in stage
+    assert "gl.nondet.exec_prompt" not in stage
+    assert "parent_source_bytes" in stage and "ci_evidence_bytes" in stage
+    assert "candidate_code" in capture
+    assert "parent_bytes_hex" not in capture_success
+    assert "candidate_bytes_hex" not in capture_success
+    assert "ci_bytes_hex" not in capture_success
+    assert "security_bytes_hex" not in capture_success
+    assert "parent_sha256" in capture_success and "parent_length" in capture_success
+    assert "Evidence must be staged before capture" in capture
 
 
 def test_v2_target_registration_interfaces_include_attestation_mode():

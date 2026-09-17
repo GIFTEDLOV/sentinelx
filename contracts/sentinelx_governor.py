@@ -14,13 +14,15 @@ import typing
 
 SCHEMA_VERSION = "sentinelx-governor-v2"
 EVIDENCE_SCHEMA = "sentinelx-evidence-v1"
-SNAPSHOT_SCHEMA = "sentinelx-evidence-snapshot-v2"
+STAGED_EVIDENCE_SCHEMA = "sentinelx-staged-evidence-v2"
+SNAPSHOT_SCHEMA = "sentinelx-evidence-snapshot-v3"
 
 SECURITY_OPTIONAL = "OPTIONAL"
 SECURITY_REQUIRED_INDEPENDENT = "REQUIRED_INDEPENDENT"
 SECURITY_MODES = (SECURITY_OPTIONAL, SECURITY_REQUIRED_INDEPENDENT)
 
 STATUS_PROPOSED = "PROPOSED"
+STATUS_EVIDENCE_STAGED = "EVIDENCE_STAGED"
 STATUS_EVIDENCE_READY = "EVIDENCE_READY"
 STATUS_EVIDENCE_REPAIR_REQUIRED = "EVIDENCE_REPAIR_REQUIRED"
 STATUS_EVIDENCE_RETRY_REQUIRED = "EVIDENCE_RETRY_REQUIRED"
@@ -59,6 +61,9 @@ MAX_TARGETS = 128
 MAX_PROPOSALS_PER_TARGET = 128
 MAX_CONSTITUTION_BYTES = 32_000
 MAX_CANDIDATE_BYTES = 768_000
+MAX_PARENT_SOURCE_BYTES = 16_384
+MAX_CI_EVIDENCE_BYTES = 16_384
+MAX_SECURITY_EVIDENCE_BYTES = 32_768
 MAX_URL_BYTES = 1_024
 MAX_TEXT_BYTES = 512
 MAX_EVIDENCE_ID_BYTES = 160
@@ -120,6 +125,7 @@ class ReleaseProposal:
     execution_deadline: u64
     status: str
     last_review_code: str
+    review_vector: str
 
 
 @gl.storage.allow
@@ -131,22 +137,50 @@ class EvidenceSnapshotRecord:
     evidence_identity: str
     parent_source_url: str
     parent_source_hash: str
+    parent_source_length: u64
     parent_source_bytes: bytes
     candidate_source_url: str
     candidate_source_hash: str
+    candidate_source_length: u64
     candidate_source_bytes: bytes
     ci_evidence_url: str
     ci_evidence_id: str
     ci_evidence_hash: str
+    ci_evidence_length: u64
     ci_evidence_bytes: bytes
     security_evidence_url: str
     security_evidence_id: str
     security_evidence_hash: str
+    security_evidence_length: u64
     security_evidence_bytes: bytes
     security_present: bool
     policy_fingerprint: str
     captured_at: u64
     snapshot_digest: str
+
+
+@gl.storage.allow
+@dataclass
+class StagedEvidenceRecord:
+    schema: str
+    proposal_id: u256
+    target: Address
+    evidence_identity: str
+    parent_source_hash: str
+    parent_source_length: u64
+    parent_source_bytes: bytes
+    ci_evidence_id: str
+    ci_evidence_hash: str
+    ci_evidence_length: u64
+    ci_evidence_bytes: bytes
+    security_evidence_id: str
+    security_evidence_hash: str
+    security_evidence_length: u64
+    security_evidence_bytes: bytes
+    security_present: bool
+    policy_fingerprint: str
+    staged_at: u64
+    staged_digest: str
 
 
 @gl.contract.interface
@@ -206,6 +240,7 @@ class SentinelXGovernor(gl.contract.Contract):
     active_proposal_by_target: TreeMap[Address, u256]
     used_evidence_ids: TreeMap[str, bool]
     installed_candidate_keys: TreeMap[str, bool]
+    staged_evidence: TreeMap[str, StagedEvidenceRecord]
     evidence_snapshots: TreeMap[str, EvidenceSnapshotRecord]
     review_web_fetch_counts: TreeMap[u256, u64]
     proposal_count: u256
@@ -689,17 +724,24 @@ class SentinelXGovernor(gl.contract.Contract):
         security_bytes: bytes,
         security_present: bool,
     ) -> dict[str, object]:
+        """Return only compact remote-attestation facts.
+
+        The fetched artifacts are intentionally not returned through the
+        nondeterministic receipt.  Exact bytes enter the contract through the
+        deterministic stage_evidence write and are joined to these facts only
+        after consensus.
+        """
         result = self._capture_base(proposal)
         result["result_kind"] = "CAPTURE"
         result["error_class"] = ""
-        result["parent_bytes_hex"] = parent_bytes.hex()
-        result["candidate_bytes_hex"] = candidate_bytes.hex()
-        result["ci_bytes_hex"] = ci_bytes.hex()
-        result["security_bytes_hex"] = security_bytes.hex()
-        result["parent_source_hash"] = _sha256_hex(parent_bytes)
-        result["candidate_source_hash"] = _sha256_hex(candidate_bytes)
-        result["ci_evidence_hash"] = _sha256_hex(ci_bytes)
-        result["security_evidence_hash"] = _sha256_hex(security_bytes) if security_present else ""
+        result["parent_sha256"] = _sha256_hex(parent_bytes)
+        result["parent_length"] = len(parent_bytes)
+        result["candidate_sha256"] = _sha256_hex(candidate_bytes)
+        result["candidate_length"] = len(candidate_bytes)
+        result["ci_sha256"] = _sha256_hex(ci_bytes)
+        result["ci_length"] = len(ci_bytes)
+        result["security_sha256"] = _sha256_hex(security_bytes) if security_present else ""
+        result["security_length"] = len(security_bytes) if security_present else 0
         result["security_present"] = security_present
         return result
 
@@ -823,6 +865,207 @@ class SentinelXGovernor(gl.contract.Contract):
             proposal, parent_bytes, candidate_bytes, ci_bytes, security_bytes, security_present
         )
 
+    @gl.public.write
+    def stage_evidence(
+        self,
+        proposal_id: u256,
+        parent_source_bytes: bytes,
+        ci_evidence_bytes: bytes,
+        security_evidence_bytes: bytes,
+    ) -> None:
+        """Persist exact, deterministically validated evidence bytes.
+
+        Staging is deliberately separate from remote attestation.  It never
+        performs a web fetch or an LLM call, and it cannot make a proposal
+        reviewable by itself.
+        """
+        proposal = self._require_proposal(proposal_id)
+        policy = self._require_owner(proposal.target)
+        if proposal.evidence_set_hash in self.evidence_snapshots:
+            raise gl.vm.UserError("Evidence snapshot is write-once and already exists")
+        if proposal.evidence_set_hash in self.staged_evidence:
+            raise gl.vm.UserError("Evidence staging is write-once and already exists")
+        if proposal.status not in (
+            STATUS_PROPOSED,
+            STATUS_EVIDENCE_REPAIR_REQUIRED,
+            STATUS_EVIDENCE_RETRY_REQUIRED,
+        ):
+            raise gl.vm.UserError("Proposal is not ready for evidence staging")
+        if policy.current_code_hash != proposal.parent_code_hash:
+            raise gl.vm.UserError("Proposal parent is no longer current")
+        if not isinstance(parent_source_bytes, bytes):
+            raise gl.vm.UserError("Parent source bytes are malformed")
+        if not isinstance(ci_evidence_bytes, bytes):
+            raise gl.vm.UserError("CI evidence bytes are malformed")
+        if not isinstance(security_evidence_bytes, bytes):
+            raise gl.vm.UserError("Security evidence bytes are malformed")
+        if len(parent_source_bytes) == 0 or len(parent_source_bytes) > MAX_PARENT_SOURCE_BYTES:
+            raise gl.vm.UserError("Parent source bytes are empty or too large")
+        if len(ci_evidence_bytes) == 0 or len(ci_evidence_bytes) > MAX_CI_EVIDENCE_BYTES:
+            raise gl.vm.UserError("CI evidence bytes are empty or too large")
+        if len(security_evidence_bytes) > MAX_SECURITY_EVIDENCE_BYTES:
+            raise gl.vm.UserError("Security evidence bytes are too large")
+        if _sha256_hex(parent_source_bytes) != proposal.parent_code_hash:
+            raise gl.vm.UserError("Staged parent source hash does not match proposal")
+        if _sha256_hex(proposal.candidate_code) != proposal.candidate_code_hash:
+            raise gl.vm.UserError("Frozen candidate hash is invalid")
+        try:
+            parent_source_bytes.decode("utf-8")
+            proposal.candidate_code.decode("utf-8")
+            ci_value = json.loads(ci_evidence_bytes.decode("utf-8"))
+        except Exception:
+            raise gl.vm.UserError("Staged source or CI evidence is not valid UTF-8 JSON")
+
+        ci_error = self._evidence_error(
+            ci_value,
+            "ci",
+            proposal.ci_evidence_id,
+            policy.ci_authority,
+            proposal,
+            self._now(),
+            int(policy.max_evidence_age_seconds),
+        )
+        if ci_error:
+            raise gl.vm.UserError("CI " + ci_error)
+        if not isinstance(ci_value, dict):
+            raise gl.vm.UserError("CI evidence object is invalid")
+        ci_obj = typing.cast(dict[object, object], ci_value)
+        required_ci = (
+            "genvm_lint",
+            "typecheck",
+            "schema",
+            "direct_tests",
+            "adversarial_tests",
+            "source_parity",
+            "transaction_safety",
+        )
+        checks = ci_obj.get("checks")
+        if not isinstance(checks, dict) or len(checks) != len(required_ci):
+            raise gl.vm.UserError("CI checks are invalid")
+        checks_obj = typing.cast(dict[object, object], checks)
+        for key in required_ci:
+            if checks_obj.get(key) is not True:
+                raise gl.vm.UserError("CI check failed: " + key)
+
+        security_present = bool(proposal.security_evidence_url) or bool(proposal.security_evidence_id)
+        if security_present != bool(security_evidence_bytes):
+            if security_present:
+                raise gl.vm.UserError("Security evidence bytes are required")
+            raise gl.vm.UserError("Security evidence bytes supplied without a security artifact")
+        if self._security_required(policy) and not security_present:
+            raise gl.vm.UserError("Required independent security evidence is missing")
+
+        security_value: object = None
+        if security_present:
+            try:
+                security_value = json.loads(security_evidence_bytes.decode("utf-8"))
+            except Exception:
+                raise gl.vm.UserError("Security evidence JSON is invalid")
+            security_error = self._evidence_error(
+                security_value,
+                "security",
+                proposal.security_evidence_id,
+                policy.security_authority,
+                proposal,
+                self._now(),
+                int(policy.max_evidence_age_seconds),
+            )
+            if security_error:
+                raise gl.vm.UserError("SECURITY_" + security_error)
+            if not isinstance(security_value, dict):
+                raise gl.vm.UserError("Security evidence object is invalid")
+            security_obj = typing.cast(dict[object, object], security_value)
+            if self._security_required(policy) and (
+                security_obj.get("verdict") != "PASS"
+                or security_obj.get("independent_review") is not True
+            ):
+                raise gl.vm.UserError("Security evidence is not independently passing")
+
+        staged = StagedEvidenceRecord(
+            schema=STAGED_EVIDENCE_SCHEMA,
+            proposal_id=proposal.proposal_id,
+            target=proposal.target,
+            evidence_identity=proposal.evidence_set_hash,
+            parent_source_hash=_sha256_hex(parent_source_bytes),
+            parent_source_length=len(parent_source_bytes),
+            parent_source_bytes=parent_source_bytes,
+            ci_evidence_id=proposal.ci_evidence_id,
+            ci_evidence_hash=_sha256_hex(ci_evidence_bytes),
+            ci_evidence_length=len(ci_evidence_bytes),
+            ci_evidence_bytes=ci_evidence_bytes,
+            security_evidence_id=proposal.security_evidence_id,
+            security_evidence_hash=_sha256_hex(security_evidence_bytes) if security_present else "",
+            security_evidence_length=len(security_evidence_bytes) if security_present else 0,
+            security_evidence_bytes=security_evidence_bytes if security_present else b"",
+            security_present=security_present,
+            policy_fingerprint=proposal.policy_fingerprint,
+            staged_at=self._now(),
+            staged_digest="",
+        )
+        staged.staged_digest = self._staged_digest(staged)
+        self.staged_evidence[proposal.evidence_set_hash] = staged
+        proposal.status = STATUS_EVIDENCE_STAGED
+        proposal.last_review_code = "EVIDENCE_STAGED"
+
+    def _staged_digest(self, staged: StagedEvidenceRecord) -> str:
+        return _hash_parts(
+            [
+                STAGED_EVIDENCE_SCHEMA,
+                str(staged.proposal_id),
+                str(staged.target),
+                staged.evidence_identity,
+                staged.parent_source_hash,
+                str(staged.parent_source_length),
+                staged.ci_evidence_id,
+                staged.ci_evidence_hash,
+                str(staged.ci_evidence_length),
+                staged.security_evidence_id,
+                staged.security_evidence_hash,
+                str(staged.security_evidence_length),
+                "1" if staged.security_present else "0",
+                staged.policy_fingerprint,
+            ]
+        )
+
+    def _staged_is_intact(
+        self, proposal: ReleaseProposal, policy: TargetPolicy, staged: StagedEvidenceRecord
+    ) -> bool:
+        if staged.schema != STAGED_EVIDENCE_SCHEMA:
+            return False
+        if staged.proposal_id != proposal.proposal_id or staged.target != proposal.target:
+            return False
+        if staged.evidence_identity != proposal.evidence_set_hash:
+            return False
+        if staged.policy_fingerprint != proposal.policy_fingerprint:
+            return False
+        if staged.ci_evidence_id != proposal.ci_evidence_id:
+            return False
+        if staged.security_evidence_id != proposal.security_evidence_id:
+            return False
+        if staged.parent_source_hash != proposal.parent_code_hash:
+            return False
+        if staged.parent_source_length != len(staged.parent_source_bytes):
+            return False
+        if staged.ci_evidence_length != len(staged.ci_evidence_bytes):
+            return False
+        if staged.security_evidence_length != len(staged.security_evidence_bytes):
+            return False
+        if _sha256_hex(staged.parent_source_bytes) != staged.parent_source_hash:
+            return False
+        if _sha256_hex(staged.ci_evidence_bytes) != staged.ci_evidence_hash:
+            return False
+        expected_security_present = bool(proposal.security_evidence_url) or bool(proposal.security_evidence_id)
+        if staged.security_present != expected_security_present:
+            return False
+        if staged.security_present:
+            if not self._security_required(policy) and not staged.security_evidence_id:
+                return False
+            if _sha256_hex(staged.security_evidence_bytes) != staged.security_evidence_hash:
+                return False
+        elif staged.security_evidence_hash or staged.security_evidence_length != 0:
+            return False
+        return staged.staged_digest == self._staged_digest(staged)
+
     def _snapshot_digest(self, snapshot: EvidenceSnapshotRecord) -> str:
         return _hash_parts(
             [
@@ -831,11 +1074,15 @@ class SentinelXGovernor(gl.contract.Contract):
                 str(snapshot.target),
                 snapshot.evidence_identity,
                 snapshot.parent_source_hash,
+                str(snapshot.parent_source_length),
                 snapshot.candidate_source_hash,
+                str(snapshot.candidate_source_length),
                 snapshot.ci_evidence_id,
                 snapshot.ci_evidence_hash,
+                str(snapshot.ci_evidence_length),
                 snapshot.security_evidence_id,
                 snapshot.security_evidence_hash,
+                str(snapshot.security_evidence_length),
                 "1" if snapshot.security_present else "0",
                 snapshot.policy_fingerprint,
             ]
@@ -863,6 +1110,14 @@ class SentinelXGovernor(gl.contract.Contract):
             return False
         if snapshot.candidate_source_hash != proposal.candidate_code_hash:
             return False
+        if snapshot.parent_source_length != len(snapshot.parent_source_bytes):
+            return False
+        if snapshot.candidate_source_length != len(snapshot.candidate_source_bytes):
+            return False
+        if snapshot.ci_evidence_length != len(snapshot.ci_evidence_bytes):
+            return False
+        if snapshot.security_evidence_length != len(snapshot.security_evidence_bytes):
+            return False
         if _sha256_hex(snapshot.parent_source_bytes) != snapshot.parent_source_hash:
             return False
         if _sha256_hex(snapshot.candidate_source_bytes) != snapshot.candidate_source_hash:
@@ -877,6 +1132,8 @@ class SentinelXGovernor(gl.contract.Contract):
             if _sha256_hex(snapshot.security_evidence_bytes) != snapshot.security_evidence_hash:
                 return False
         elif snapshot.security_evidence_hash or snapshot.security_evidence_id:
+            return False
+        elif snapshot.security_evidence_length != 0:
             return False
         return snapshot.snapshot_digest == self._snapshot_digest(snapshot)
 
@@ -968,19 +1225,31 @@ class SentinelXGovernor(gl.contract.Contract):
 
     @gl.public.write
     def capture_evidence(self, proposal_id: u256) -> None:
-        """Fetch, authenticate, and pin all evidence before semantic review.
+        """Attest immutable remote provenance for deterministically staged bytes.
 
         Both leader and validators independently retrieve the same immutable
-        resources. Only a consensus-approved complete result is written. A
-        snapshot identity is derived from proposal bindings and evidence IDs,
-        never from transport URLs, so an exact-byte recovery URL is equivalent.
+        resources. Only compact hashes, lengths, and proposal bindings cross
+        the nondeterministic receipt boundary. Exact snapshot bytes come from
+        the earlier deterministic stage_evidence write.
         """
         proposal = self._require_proposal(proposal_id)
         policy = self._require_owner(proposal.target)
         if proposal.evidence_set_hash in self.evidence_snapshots:
             raise gl.vm.UserError("Evidence snapshot is write-once and already exists")
-        if proposal.status not in (STATUS_PROPOSED, STATUS_EVIDENCE_REPAIR_REQUIRED, STATUS_EVIDENCE_RETRY_REQUIRED):
+        if proposal.evidence_set_hash not in self.staged_evidence:
+            raise gl.vm.UserError("Evidence must be staged before capture")
+        if proposal.status not in (
+            STATUS_PROPOSED,
+            STATUS_EVIDENCE_STAGED,
+            STATUS_EVIDENCE_REPAIR_REQUIRED,
+            STATUS_EVIDENCE_RETRY_REQUIRED,
+        ):
             raise gl.vm.UserError("Proposal is not ready for evidence capture")
+        staged = self.staged_evidence[proposal.evidence_set_hash]
+        if not self._staged_is_intact(proposal, policy, staged):
+            proposal.status = STATUS_EVIDENCE_REPAIR_REQUIRED
+            proposal.last_review_code = "STAGED_EVIDENCE_HASH_MISMATCH"
+            return
         now = self._now()
         proposal_memory = gl.storage.copy_to_memory(proposal)
         policy_memory = gl.storage.copy_to_memory(policy)
@@ -1012,31 +1281,55 @@ class SentinelXGovernor(gl.contract.Contract):
         if kind != "CAPTURE":
             raise gl.vm.UserError("Evidence capture result kind is invalid")
 
-        parent_bytes = bytes.fromhex(typing.cast(str, result["parent_bytes_hex"]))
-        candidate_bytes = bytes.fromhex(typing.cast(str, result["candidate_bytes_hex"]))
-        ci_bytes = bytes.fromhex(typing.cast(str, result["ci_bytes_hex"]))
-        security_bytes = bytes.fromhex(typing.cast(str, result["security_bytes_hex"]))
-        security_present = typing.cast(bool, result["security_present"])
+        expected_compact = {
+            "target": str(proposal.target),
+            "proposal_id": int(proposal.proposal_id),
+            "parent_hash": proposal.parent_code_hash,
+            "candidate_hash": proposal.candidate_code_hash,
+            "policy_fingerprint": proposal.policy_fingerprint,
+            "evidence_identity": proposal.evidence_set_hash,
+            "result_kind": "CAPTURE",
+            "error_class": "",
+            "parent_sha256": staged.parent_source_hash,
+            "parent_length": len(staged.parent_source_bytes),
+            "candidate_sha256": proposal.candidate_code_hash,
+            "candidate_length": len(proposal.candidate_code),
+            "ci_sha256": staged.ci_evidence_hash,
+            "ci_length": len(staged.ci_evidence_bytes),
+            "security_sha256": staged.security_evidence_hash,
+            "security_length": len(staged.security_evidence_bytes),
+            "security_present": staged.security_present,
+        }
+        for key, expected in expected_compact.items():
+            if result.get(key) != expected:
+                proposal.status = STATUS_EVIDENCE_REPAIR_REQUIRED
+                proposal.last_review_code = "CAPTURE_ATTESTATION_MISMATCH_" + key.upper()
+                return
+
         snapshot = EvidenceSnapshotRecord(
             schema=SNAPSHOT_SCHEMA,
             proposal_id=proposal.proposal_id,
             target=proposal.target,
             evidence_identity=proposal.evidence_set_hash,
             parent_source_url=proposal.parent_source_url,
-            parent_source_hash=typing.cast(str, result["parent_source_hash"]),
-            parent_source_bytes=parent_bytes,
+            parent_source_hash=typing.cast(str, result["parent_sha256"]),
+            parent_source_length=typing.cast(int, result["parent_length"]),
+            parent_source_bytes=staged.parent_source_bytes,
             candidate_source_url=proposal.candidate_source_url,
-            candidate_source_hash=typing.cast(str, result["candidate_source_hash"]),
-            candidate_source_bytes=candidate_bytes,
+            candidate_source_hash=typing.cast(str, result["candidate_sha256"]),
+            candidate_source_length=typing.cast(int, result["candidate_length"]),
+            candidate_source_bytes=proposal.candidate_code,
             ci_evidence_url=proposal.ci_evidence_url,
             ci_evidence_id=proposal.ci_evidence_id,
-            ci_evidence_hash=typing.cast(str, result["ci_evidence_hash"]),
-            ci_evidence_bytes=ci_bytes,
+            ci_evidence_hash=typing.cast(str, result["ci_sha256"]),
+            ci_evidence_length=typing.cast(int, result["ci_length"]),
+            ci_evidence_bytes=staged.ci_evidence_bytes,
             security_evidence_url=proposal.security_evidence_url,
             security_evidence_id=proposal.security_evidence_id,
-            security_evidence_hash=typing.cast(str, result["security_evidence_hash"]),
-            security_evidence_bytes=security_bytes,
-            security_present=security_present,
+            security_evidence_hash=typing.cast(str, result["security_sha256"]),
+            security_evidence_length=typing.cast(int, result["security_length"]),
+            security_evidence_bytes=staged.security_evidence_bytes,
+            security_present=staged.security_present,
             policy_fingerprint=proposal.policy_fingerprint,
             captured_at=now,
             snapshot_digest="",
@@ -1099,6 +1392,9 @@ class SentinelXGovernor(gl.contract.Contract):
             return
         if kind != RESULT_DECISION:
             raise gl.vm.UserError("Review result kind is invalid")
+        proposal.review_vector = _normalize_json(
+            {key: result.get(key) for key in SEMANTIC_VECTOR}
+        )
         if result.get("decision") == DECISION_REJECT:
             proposal.status = STATUS_REJECTED
             self._release_active(proposal.target, proposal_id)
@@ -1336,6 +1632,7 @@ class SentinelXGovernor(gl.contract.Contract):
             execution_deadline=0,
             status=STATUS_PROPOSED,
             last_review_code="",
+            review_vector="",
         )
         proposal.evidence_set_hash = self._evidence_set_hash(proposal)
         self.proposals[proposal_id] = proposal
@@ -1358,7 +1655,12 @@ class SentinelXGovernor(gl.contract.Contract):
     ) -> None:
         proposal = self._require_proposal(proposal_id)
         policy = self._require_owner(proposal.target)
-        if proposal.status not in (STATUS_EVIDENCE_REPAIR_REQUIRED, STATUS_EVIDENCE_RETRY_REQUIRED, STATUS_REVIEW_RETRY_REQUIRED):
+        if proposal.status not in (
+            STATUS_EVIDENCE_STAGED,
+            STATUS_EVIDENCE_REPAIR_REQUIRED,
+            STATUS_EVIDENCE_RETRY_REQUIRED,
+            STATUS_REVIEW_RETRY_REQUIRED,
+        ):
             raise gl.vm.UserError("Proposal is not awaiting evidence repair")
         if self._now() > int(proposal.expires_at):
             raise gl.vm.UserError("Proposal has expired")
@@ -1422,6 +1724,7 @@ class SentinelXGovernor(gl.contract.Contract):
         self._require_owner(proposal.target)
         if proposal.status not in (
             STATUS_PROPOSED,
+            STATUS_EVIDENCE_STAGED,
             STATUS_EVIDENCE_REPAIR_REQUIRED,
             STATUS_EVIDENCE_RETRY_REQUIRED,
             STATUS_REVIEW_RETRY_REQUIRED,
@@ -1437,6 +1740,7 @@ class SentinelXGovernor(gl.contract.Contract):
         proposal = self._require_proposal(proposal_id)
         if proposal.status not in (
             STATUS_PROPOSED,
+            STATUS_EVIDENCE_STAGED,
             STATUS_EVIDENCE_REPAIR_REQUIRED,
             STATUS_EVIDENCE_RETRY_REQUIRED,
             STATUS_REVIEW_RETRY_REQUIRED,
@@ -1654,6 +1958,40 @@ class SentinelXGovernor(gl.contract.Contract):
         return self.policies[target_address].policy_fingerprint
 
     @gl.public.view
+    def get_staged_evidence(self, proposal_id: u256) -> str:
+        if proposal_id not in self.proposals:
+            return json.dumps({"status": "UNKNOWN"}, separators=(",", ":"))
+        proposal = self.proposals[proposal_id]
+        if proposal.evidence_set_hash not in self.staged_evidence:
+            return json.dumps(
+                {"status": proposal.status, "evidence_identity": proposal.evidence_set_hash},
+                separators=(",", ":"),
+            )
+        staged = self.staged_evidence[proposal.evidence_set_hash]
+        return json.dumps(
+            {
+                "status": STATUS_EVIDENCE_STAGED,
+                "schema": staged.schema,
+                "proposal_id": int(staged.proposal_id),
+                "target": str(staged.target),
+                "evidence_identity": staged.evidence_identity,
+                "parent_source_hash": staged.parent_source_hash,
+                "parent_source_length": int(staged.parent_source_length),
+                "ci_evidence_id": staged.ci_evidence_id,
+                "ci_evidence_hash": staged.ci_evidence_hash,
+                "ci_evidence_length": int(staged.ci_evidence_length),
+                "security_evidence_id": staged.security_evidence_id,
+                "security_evidence_hash": staged.security_evidence_hash,
+                "security_evidence_length": int(staged.security_evidence_length),
+                "security_present": staged.security_present,
+                "policy_fingerprint": staged.policy_fingerprint,
+                "staged_at": int(staged.staged_at),
+                "staged_digest": staged.staged_digest,
+            },
+            separators=(",", ":"),
+        )
+
+    @gl.public.view
     def get_evidence_snapshot(self, proposal_id: u256) -> str:
         if proposal_id not in self.proposals:
             return json.dumps({"status": "UNKNOWN"}, separators=(",", ":"))
@@ -1673,14 +2011,18 @@ class SentinelXGovernor(gl.contract.Contract):
                 "evidence_identity": snapshot.evidence_identity,
                 "parent_source_url": snapshot.parent_source_url,
                 "parent_source_hash": snapshot.parent_source_hash,
+                "parent_source_length": int(snapshot.parent_source_length),
                 "candidate_source_url": snapshot.candidate_source_url,
                 "candidate_source_hash": snapshot.candidate_source_hash,
+                "candidate_source_length": int(snapshot.candidate_source_length),
                 "ci_evidence_url": snapshot.ci_evidence_url,
                 "ci_evidence_id": snapshot.ci_evidence_id,
                 "ci_evidence_hash": snapshot.ci_evidence_hash,
+                "ci_evidence_length": int(snapshot.ci_evidence_length),
                 "security_evidence_url": snapshot.security_evidence_url,
                 "security_evidence_id": snapshot.security_evidence_id,
                 "security_evidence_hash": snapshot.security_evidence_hash,
+                "security_evidence_length": int(snapshot.security_evidence_length),
                 "security_present": snapshot.security_present,
                 "policy_fingerprint": snapshot.policy_fingerprint,
                 "captured_at": int(snapshot.captured_at),
@@ -1731,6 +2073,7 @@ class SentinelXGovernor(gl.contract.Contract):
                 "execution_deadline": int(proposal.execution_deadline),
                 "status": proposal.status,
                 "last_review_code": proposal.last_review_code,
+                "semantic_vector": json.loads(proposal.review_vector) if proposal.review_vector else {},
             },
             separators=(",", ":"),
         )

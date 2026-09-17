@@ -1,4 +1,4 @@
-"""Run isolated GenVM v0.6 semantic validation for the frozen V2.1 sources.
+"""Run isolated GenVM v0.6 semantic validation for the frozen V2.2 sources.
 
 The repository freezes the static linter at 0.11.0 and the semantic RC at
 0.11.1rc2.  They are separate gates: the former is used by ``preflight.py``;
@@ -31,7 +31,7 @@ CONTRACTS = (
     ROOT / "contracts" / "protected_app_v2_unsafe.py",
 )
 FROZEN_HASHES = {
-    "sentinelx_governor.py": "70d140aaefaf258cbbaef07a0c06c67a0cb833921c62defc6158847f78332e0e",
+    "sentinelx_governor.py": "21dbb84f7c784841a4f970c81bd7166439779a55298217c5f50c7606f18a2494",
     "protected_app_v1.py": "470c9a72c63f8ca345956299edc530bc92924eaa1708c05a767b141df05d1c4f",
     "protected_app_v2_safe.py": "72c240f0725dc314429d01f051d4b40dc906623f48ba2b38514824d7f46011e5",
     "protected_app_v2_unsafe.py": "6b3f7a0ebae0f097036f33b57b77b1d10ae2d813b7330e34ba1dab33a5010653",
@@ -42,7 +42,7 @@ def _verify_sources() -> None:
     for path in CONTRACTS:
         actual = hashlib.sha256(path.read_bytes()).hexdigest()
         if actual != FROZEN_HASHES[path.name]:
-            raise RuntimeError(f"frozen V2 source changed unexpectedly: {path} ({actual})")
+            raise RuntimeError(f"frozen V2.2 source changed unexpectedly: {path} ({actual})")
 
 
 def _install_semantic_linter(target: Path) -> None:

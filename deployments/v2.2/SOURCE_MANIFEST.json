@@ -1,0 +1,39 @@
+{
+  "chain_id": 61997,
+  "contract_version": "SentinelX V2.2",
+  "contracts": [
+    {
+      "bytes": 94351,
+      "path": "contracts/sentinelx_governor.py",
+      "sha256": "21dbb84f7c784841a4f970c81bd7166439779a55298217c5f50c7606f18a2494"
+    },
+    {
+      "bytes": 7228,
+      "path": "contracts/protected_app_v1.py",
+      "sha256": "470c9a72c63f8ca345956299edc530bc92924eaa1708c05a767b141df05d1c4f"
+    },
+    {
+      "bytes": 7008,
+      "path": "contracts/protected_app_v2_safe.py",
+      "sha256": "72c240f0725dc314429d01f051d4b40dc906623f48ba2b38514824d7f46011e5"
+    },
+    {
+      "bytes": 3753,
+      "path": "contracts/protected_app_v2_unsafe.py",
+      "sha256": "6b3f7a0ebae0f097036f33b57b77b1d10ae2d813b7330e34ba1dab33a5010653"
+    }
+  ],
+  "network": "studio-dev",
+  "rpc": "https://studio-dev.genlayer.com/api",
+  "schema": "sentinelx-v2.2-source-manifest-v1",
+  "source_lineage": "SentinelX V2 failed disposable registration profile -> V2.1 corrected registration state machine -> V2.1 capture-output-limit profile -> V2.2 deterministic byte staging and compact remote attestation",
+  "toolchain": {
+    "genlayer_cli": "0.40.0-rc.3",
+    "genlayer_js": "2.0.0-rc.1",
+    "genlayer_py": "0.19.0rc2",
+    "genvm_linter_semantic": "0.11.1rc2",
+    "genvm_linter_static": "0.11.0",
+    "genvm_runner": "v0.6.0-rc5",
+    "gltest": "0.30.0rc2"
+  }
+}

@@ -1,4 +1,4 @@
-"""Build and verify the frozen SentinelX V2.1 source manifest."""
+"""Build and verify the frozen SentinelX V2.2 source manifest."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_PATH = ROOT / "deployments" / "v2.1" / "SOURCE_MANIFEST.json"
+MANIFEST_PATH = ROOT / "deployments" / "v2.2" / "SOURCE_MANIFEST.json"
 CONTRACT_PATHS = (
     "contracts/sentinelx_governor.py",
     "contracts/protected_app_v1.py",
@@ -30,9 +30,9 @@ def _source_record(relative_path: str) -> dict[str, Any]:
 
 def build_manifest() -> dict[str, Any]:
     return {
-        "schema": "sentinelx-v2.1-source-manifest-v1",
-        "contract_version": "SentinelX V2.1",
-        "source_lineage": "SentinelX V2 failed disposable registration profile -> V2.1 corrected candidate -> V2.1 runtime-compatibility corrections (nested storage, address, optional wire normalization, and v0.6 nondeterministic API)",
+        "schema": "sentinelx-v2.2-source-manifest-v1",
+        "contract_version": "SentinelX V2.2",
+        "source_lineage": "SentinelX V2 failed disposable registration profile -> V2.1 corrected registration state machine -> V2.1 capture-output-limit profile -> V2.2 deterministic byte staging and compact remote attestation",
         "network": "studio-dev",
         "rpc": "https://studio-dev.genlayer.com/api",
         "chain_id": 61997,
@@ -52,7 +52,7 @@ def build_manifest() -> dict[str, Any]:
 def verify_manifest(manifest: dict[str, Any] | None = None) -> list[str]:
     value = manifest if manifest is not None else json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     errors: list[str] = []
-    if value.get("schema") != "sentinelx-v2.1-source-manifest-v1":
+    if value.get("schema") != "sentinelx-v2.2-source-manifest-v1":
         errors.append("manifest schema mismatch")
     if value.get("network") != "studio-dev" or value.get("chain_id") != 61997:
         errors.append("manifest network mismatch")

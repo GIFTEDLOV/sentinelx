@@ -1,4 +1,4 @@
-"""Adversarial mutation suite for the frozen SentinelX V2 boundary.
+"""Adversarial mutation suite for the SentinelX V2.2 boundary.
 
 Each mutation is applied to a temporary copy of the production contract and,
 where the deterministic V2 oracle can exercise the invariant, its temporary
@@ -33,7 +33,7 @@ TARGET = ROOT / "contracts" / "protected_app_v1.py"
 ORACLE = ROOT / "direct" / "sentinelx_v2_model.py"
 ORACLE_BASE = ROOT / "direct" / "sentinelx_model.py"
 FROZEN_HASHES = {
-    GOVERNOR: "70d140aaefaf258cbbaef07a0c06c67a0cb833921c62defc6158847f78332e0e",
+    GOVERNOR: "21dbb84f7c784841a4f970c81bd7166439779a55298217c5f50c7606f18a2494",
     ROOT / "contracts" / "protected_app_v1.py": "470c9a72c63f8ca345956299edc530bc92924eaa1708c05a767b141df05d1c4f",
     ROOT / "contracts" / "protected_app_v2_safe.py": "72c240f0725dc314429d01f051d4b40dc906623f48ba2b38514824d7f46011e5",
     ROOT / "contracts" / "protected_app_v2_unsafe.py": "6b3f7a0ebae0f097036f33b57b77b1d10ae2d813b7330e34ba1dab33a5010653",
@@ -87,6 +87,35 @@ def _source_many(replacements: list[tuple[str, str, str]]) -> Callable[[str], st
     return lambda text: _replace_many(text, replacements)
 
 
+def _source_in_function(function_name: str, old: str, new: str, label: str) -> Callable[[str], str]:
+    def mutate(text: str) -> str:
+        marker = "    def " + function_name
+        start = text.find(marker)
+        if start < 0:
+            raise AssertionError(f"{label}: function not found")
+        next_function = text.find("\n    def ", start + len(marker))
+        end = len(text) if next_function < 0 else next_function
+        body = text[start:end]
+        mutated = _replace_once(body, old, new, label)
+        return text[:start] + mutated + text[end:]
+    return mutate
+
+
+def _source_many_in_function(
+    function_name: str, replacements: list[tuple[str, str, str]]
+) -> Callable[[str], str]:
+    def mutate(text: str) -> str:
+        marker = "    def " + function_name
+        start = text.find(marker)
+        if start < 0:
+            raise AssertionError(f"{function_name}: function not found")
+        next_function = text.find("\n    def ", start + len(marker))
+        end = len(text) if next_function < 0 else next_function
+        body = text[start:end]
+        return text[:start] + _replace_many(body, replacements) + text[end:]
+    return mutate
+
+
 def _mutate_required_contract(text: str) -> str:
     text = _replace_first(
         text,
@@ -94,12 +123,45 @@ def _mutate_required_contract(text: str) -> str:
         '        if False:\n            raise gl.vm.UserError("Required independent security evidence is missing")\n',
         "required security proposal",
     )
-    return _replace_once(
+    text = _replace_once(
         text,
         '        elif self._security_required(policy):\n            return self._capture_error(proposal, "SECURITY_REQUIRED_MISSING")\n',
         '        elif False:\n            return self._capture_error(proposal, "SECURITY_REQUIRED_MISSING")\n',
         "required security capture",
     )
+    return _replace_once(
+        text,
+        '        if self._security_required(policy) and not security_present:\n            raise gl.vm.UserError("Required independent security evidence is missing")\n',
+        '        if False:\n            raise gl.vm.UserError("Required independent security evidence is missing")\n',
+        "required security staging",
+    )
+
+
+def _mutate_required_oracle(text: str) -> str:
+    text = _source_in_function(
+        "create_proposal",
+        '        if policy.security_attestation_mode == REQUIRED_INDEPENDENT and not security_present:\n            raise SentinelXError("Required independent security evidence is missing")\n',
+        '        if False:\n            raise SentinelXError("Required independent security evidence is missing")\n',
+        "required security oracle proposal",
+    )(text)
+    text = _source_in_function(
+        "stage_evidence",
+        '        if policy.security_attestation_mode == REQUIRED_INDEPENDENT and not security_present:\n            raise SentinelXError("Required independent security evidence is missing")\n',
+        '        if False:\n            raise SentinelXError("Required independent security evidence is missing")\n',
+        "required security oracle staging",
+    )(text)
+    text = _source_in_function(
+        "_staged_intact",
+        '            and (policy.security_attestation_mode != REQUIRED_INDEPENDENT or staged.security_present)\n',
+        '            and True\n',
+        "required security oracle staged integrity",
+    )(text)
+    return _source_in_function(
+        "capture_evidence",
+        '            elif policy.security_attestation_mode == REQUIRED_INDEPENDENT:\n                raise Repair("SECURITY_REQUIRED_MISSING")\n',
+        '            elif False:\n                raise Repair("SECURITY_REQUIRED_MISSING")\n',
+        "required security oracle capture",
+    )(text)
 
 
 def _copy_and_mutate(root: Path, mutation: Mutation) -> tuple[Path, Path | None]:
@@ -197,6 +259,18 @@ def _ci_body(proposal: Any, *, published: int = NOW - 10,
     return json.dumps(value).encode()
 
 
+def _security_body(proposal: Any) -> bytes:
+    return json.dumps({
+        "schema": "sentinelx-evidence-v1", "kind": "security",
+        "evidence_id": proposal.security_evidence_id, "issuer": "security-authority",
+        "target": TARGET_ADDRESS, "parent_sha256": proposal.parent_code_hash,
+        "candidate_sha256": proposal.candidate_code_hash,
+        "policy_fingerprint": proposal.policy_fingerprint,
+        "published_at": NOW - 10, "expires_at": NOW + 3_600,
+        "verdict": "PASS", "independent_review": True,
+    }).encode()
+
+
 def _prepared(module: ModuleType, *, mode: str | None = None,
               security: bool = False, candidate: bytes = CANDIDATE,
               candidate_url: str | None = None, ci_id: str = "ci-proof-0001") -> tuple[Any, Any]:
@@ -222,16 +296,25 @@ def _prepared(module: ModuleType, *, mode: str | None = None,
         ci_evidence_id=ci_id, security_evidence_url=security_url,
         security_evidence_id=security_id, caller=OWNER_ADDRESS,
     )
+    model.stage_evidence(
+        proposal.proposal_id, parent_source_bytes=PARENT,
+        ci_evidence_bytes=_ci_body(proposal),
+        security_evidence_bytes=_security_body(proposal) if security else b"",
+        caller=OWNER_ADDRESS,
+    )
     return model, proposal
 
 
 def _web(proposal: Any, *, parent: bytes = PARENT, candidate: bytes = CANDIDATE,
-         ci: bytes | None = None) -> dict[str, bytes]:
-    return {
+         ci: bytes | None = None, security: bytes | None = None) -> dict[str, bytes]:
+    result = {
         proposal.parent_source_url: parent,
         proposal.candidate_source_url: candidate,
         proposal.ci_evidence_url: ci or _ci_body(proposal),
     }
+    if proposal.security_evidence_url:
+        result[proposal.security_evidence_url] = security or _security_body(proposal)
+    return result
 
 
 def _all_true(module: ModuleType) -> dict[str, bool]:
@@ -307,6 +390,10 @@ def probe_mirror_bytes(module: ModuleType) -> None:
         proposal.proposal_id, candidate_source_url=SOURCE_PREFIX + "d" * 40 + "/mirror.py",
         ci_evidence_url=proposal.ci_evidence_url, ci_evidence_id="ci-proof-0002",
         caller=OWNER_ADDRESS,
+    )
+    model.stage_evidence(
+        proposal.proposal_id, parent_source_bytes=PARENT,
+        ci_evidence_bytes=_ci_body(proposal), caller=OWNER_ADDRESS,
     )
     _expect_error(lambda: model.capture_evidence(
         proposal.proposal_id,
@@ -455,6 +542,124 @@ def probe_post_verified_mutation(module: ModuleType) -> None:
         ci_evidence_url=proposal.ci_evidence_url, ci_evidence_id="ci-proof-0002",
         caller=OWNER_ADDRESS,
     ), "post-VERIFIED proposal mutation")
+
+
+def probe_compact_output(module: ModuleType, forbidden: str) -> None:
+    model, proposal = _prepared(module)
+    result = model._compact_capture_result(
+        proposal, PARENT, CANDIDATE, _ci_body(proposal), b"", False
+    )
+    if forbidden in result:
+        raise AssertionError(f"compact capture returned bulk field {forbidden}")
+    rendered = json.dumps(result, sort_keys=True, separators=(",", ":"))
+    if PARENT.hex() in rendered or CANDIDATE.hex() in rendered:
+        raise AssertionError("compact capture returned bulk artifact data")
+
+
+def probe_staging_parent_validation(module: ModuleType) -> None:
+    model, proposal = _prepared(module)
+    # Use a fresh proposal so the fixture's valid staged record is not reused.
+    model2, proposal2 = _prepared(module, ci_id="ci-proof-0002")
+    del model
+    del proposal
+    # The fixture starts staged; remove only the staged record to exercise the
+    # deterministic write itself.
+    model2.staged.pop(proposal2.evidence_identity)
+    _expect_error(lambda: model2.stage_evidence(
+        proposal2.proposal_id, parent_source_bytes=b"wrong",
+        ci_evidence_bytes=_ci_body(proposal2), caller=OWNER_ADDRESS,
+    ), "staged parent hash")
+
+
+def probe_staged_ci_integrity(module: ModuleType) -> None:
+    model, proposal = _prepared(module)
+    staged = model.staged[proposal.evidence_identity]
+    staged.ci_evidence_bytes = b"x" * len(staged.ci_evidence_bytes)
+    if model.capture_evidence(
+        proposal.proposal_id, web=_web(proposal), caller=OWNER_ADDRESS
+    ) == module.EVIDENCE_READY:
+        raise AssertionError("tampered staged CI bytes were accepted")
+
+
+def probe_remote_parent_binding(module: ModuleType) -> None:
+    model, proposal = _prepared(module)
+    bad_parent = b"x" * len(PARENT)
+    if model.capture_evidence(
+        proposal.proposal_id, web=_web(proposal, parent=bad_parent), caller=OWNER_ADDRESS
+    ) == module.EVIDENCE_READY:
+        raise AssertionError("remote parent bytes mismatching staged bytes were accepted")
+
+
+def probe_remote_ci_binding(module: ModuleType) -> None:
+    model, proposal = _prepared(module)
+    value = json.loads(_ci_body(proposal))
+    reordered = json.dumps({key: value[key] for key in reversed(list(value))}).encode()
+    if len(reordered) != len(_ci_body(proposal)):
+        raise AssertionError("CI reorder fixture did not preserve length")
+    if model.capture_evidence(
+        proposal.proposal_id, web=_web(proposal, ci=reordered), caller=OWNER_ADDRESS
+    ) == module.EVIDENCE_READY:
+        raise AssertionError("remote CI bytes mismatching staged bytes were accepted")
+
+
+def probe_remote_candidate_binding(module: ModuleType) -> None:
+    model, proposal = _prepared(module)
+    bad_candidate = b"x" * len(CANDIDATE)
+    if model.capture_evidence(
+        proposal.proposal_id, web=_web(proposal, candidate=bad_candidate), caller=OWNER_ADDRESS
+    ) == module.EVIDENCE_READY:
+        raise AssertionError("remote candidate bytes mismatching frozen bytes were accepted")
+
+
+def probe_security_mirror_binding(module: ModuleType) -> None:
+    model, proposal = _prepared(module, security=True)
+    value = json.loads(_security_body(proposal))
+    mirrored = json.dumps({key: value[key] for key in reversed(list(value))}).encode()
+    if len(mirrored) != len(_security_body(proposal)):
+        raise AssertionError("security reorder fixture did not preserve length")
+    if model.capture_evidence(
+        proposal.proposal_id,
+        web=_web(proposal, security=mirrored), caller=OWNER_ADDRESS,
+    ) == module.EVIDENCE_READY:
+        raise AssertionError("security mirror with different bytes was accepted")
+
+
+def probe_stage_not_ready(module: ModuleType) -> None:
+    model, proposal = _prepared(module)
+    if proposal.status == module.EVIDENCE_READY:
+        raise AssertionError("staging alone marked evidence ready")
+    if proposal.evidence_identity in model.snapshots:
+        raise AssertionError("staging created an authenticated snapshot")
+
+
+def probe_staged_overwrite(module: ModuleType) -> None:
+    model, proposal = _capture(module)
+    _expect_error(lambda: model.stage_evidence(
+        proposal.proposal_id, parent_source_bytes=PARENT,
+        ci_evidence_bytes=_ci_body(proposal), caller=OWNER_ADDRESS,
+    ), "staged evidence overwrite")
+
+
+def probe_unattested_review(module: ModuleType) -> None:
+    model, proposal = _prepared(module)
+    staged = model.staged[proposal.evidence_identity]
+    fake = module.V2Snapshot(
+        proposal.proposal_id, proposal.target, proposal.evidence_identity,
+        proposal.parent_source_url, staged.parent_source_bytes,
+        proposal.candidate_source_url, proposal.candidate_code,
+        proposal.ci_evidence_url, proposal.ci_evidence_id, staged.ci_evidence_bytes,
+        proposal.security_evidence_url, proposal.security_evidence_id,
+        staged.security_evidence_bytes, staged.security_present,
+        proposal.policy_fingerprint, staged.parent_hash, len(staged.parent_source_bytes),
+        proposal.candidate_code_hash, len(proposal.candidate_code), staged.ci_hash,
+        len(staged.ci_evidence_bytes), staged.security_hash,
+        len(staged.security_evidence_bytes), "",
+    )
+    fake = type(fake)(**{**fake.__dict__, "snapshot_digest": model._snapshot_digest(fake)})
+    model.snapshots[proposal.evidence_identity] = fake
+    _expect_error(lambda: model.review(
+        proposal.proposal_id, semantic=_all_true(module), caller=OWNER_ADDRESS
+    ), "review from unattested staged evidence")
 
 
 def _registration_args(module: ModuleType) -> dict[str, object]:
@@ -676,6 +881,60 @@ def gate_duplicate_policy(functions: dict[str, str]) -> None:
     assert "target_address in self.policies" in functions["register_target"]
 
 
+def gate_compact_output(functions: dict[str, str]) -> None:
+    body = functions["_capture_success"]
+    assert "parent_sha256" in body and "candidate_length" in body
+    assert "parent_bytes_hex" not in body
+    assert "candidate_bytes_hex" not in body
+    assert "ci_bytes_hex" not in body
+    assert "security_bytes_hex" not in body
+
+
+def gate_stage_parent(functions: dict[str, str]) -> None:
+    assert "_sha256_hex(parent_source_bytes) != proposal.parent_code_hash" in functions["stage_evidence"]
+
+
+def gate_staged_ci(functions: dict[str, str]) -> None:
+    assert "_sha256_hex(staged.ci_evidence_bytes) != staged.ci_evidence_hash" in functions["_staged_is_intact"]
+
+
+def gate_remote_parent(functions: dict[str, str]) -> None:
+    assert "_sha256_hex(parent_bytes) != proposal.parent_code_hash" in functions["_independent_capture"]
+    assert '"parent_sha256": staged.parent_source_hash' in functions["capture_evidence"]
+
+
+def gate_remote_ci(functions: dict[str, str]) -> None:
+    assert '"ci_sha256": staged.ci_evidence_hash' in functions["capture_evidence"]
+
+
+def gate_security_binding(functions: dict[str, str]) -> None:
+    assert '"security_sha256": staged.security_evidence_hash' in functions["capture_evidence"]
+
+
+def gate_remote_candidate(functions: dict[str, str]) -> None:
+    body = functions["_independent_capture"]
+    assert "candidate_bytes != proposal.candidate_code" in body
+    assert '"candidate_sha256": proposal.candidate_code_hash' in functions["capture_evidence"]
+
+
+def gate_stage_not_ready(functions: dict[str, str]) -> None:
+    assert "proposal.status = STATUS_EVIDENCE_STAGED" in functions["stage_evidence"]
+    assert "STATUS_EVIDENCE_READY" not in functions["stage_evidence"]
+
+
+def gate_staged_overwrite(functions: dict[str, str]) -> None:
+    body = functions["stage_evidence"]
+    assert "proposal.evidence_set_hash in self.evidence_snapshots" in body
+    assert "proposal.evidence_set_hash in self.staged_evidence" in body
+
+
+def gate_unattested_review(functions: dict[str, str]) -> None:
+    body = functions["review_proposal"]
+    assert "STATUS_EVIDENCE_STAGED" not in body
+    assert "STATUS_EVIDENCE_READY" in body
+    assert "evidence_set_hash not in self.evidence_snapshots" in functions["_review_proposal"]
+
+
 def _mutations() -> tuple[Mutation, ...]:
     governor = GOVERNOR
     target = TARGET
@@ -689,10 +948,11 @@ def _mutations() -> tuple[Mutation, ...]:
             '        if candidate_bytes != proposal.candidate_code:\n            return self._capture_error(proposal, "CANDIDATE_BYTES_MISMATCH")\n',
             '        if False:\n            return self._capture_error(proposal, "CANDIDATE_BYTES_MISMATCH")\n', "candidate equality"),
             _source('            if sha256_hex(candidate) != proposal.candidate_code_hash or candidate != proposal.candidate_code:\n                raise Repair("CANDIDATE_BYTES_MISMATCH")\n', '            if sha256_hex(candidate) != proposal.candidate_code_hash:\n                raise Repair("CANDIDATE_BYTES_MISMATCH")\n', "candidate equality oracle"), probe_candidate_frozen, gate_candidate_equality),
-        Mutation(3, "allow evidence snapshot overwrite", governor, _source(
+        Mutation(3, "allow evidence snapshot overwrite", governor, _source_in_function(
+            "capture_evidence",
             '        if proposal.evidence_set_hash in self.evidence_snapshots:\n            raise gl.vm.UserError("Evidence snapshot is write-once and already exists")\n',
             '        if False:\n            raise gl.vm.UserError("Evidence snapshot is write-once and already exists")\n', "snapshot write-once"),
-            _source('        if proposal.evidence_identity in self.snapshots:\n            raise SentinelXError("Evidence snapshot is write-once")\n', '        if False:\n            raise SentinelXError("Evidence snapshot is write-once")\n', "snapshot write-once oracle"), probe_snapshot_write_once, gate_write_once),
+            _source_in_function("capture_evidence", '        if proposal.evidence_identity in self.snapshots:\n            raise SentinelXError("Evidence snapshot is write-once")\n', '        if False:\n            raise SentinelXError("Evidence snapshot is write-once")\n', "snapshot write-once oracle"), probe_snapshot_write_once, gate_write_once),
         Mutation(4, "remove proposal-to-snapshot binding", governor, _source(
             '        if snapshot.proposal_id != proposal.proposal_id or snapshot.target != proposal.target:\n            return False\n',
             '        if False:\n            return False\n', "snapshot binding"),
@@ -743,10 +1003,7 @@ def _mutations() -> tuple[Mutation, ...]:
             ('        if published > self.now or self.now - published > self.policies[proposal.target].max_age:\n            return "EVIDENCE_STALE"\n', '        if False:\n            return "EVIDENCE_STALE"\n', "freshness oracle age"),
             ('        if expires < self.now or expires < published:\n            return "EVIDENCE_EXPIRED"\n', '        if False:\n            return "EVIDENCE_EXPIRED"\n', "freshness oracle expiry"),
         ]), probe_freshness, gate_freshness),
-        Mutation(14, "make REQUIRED_INDEPENDENT accept no security artifact", governor, _mutate_required_contract, _source_many([
-            ('        if policy.security_attestation_mode == REQUIRED_INDEPENDENT and not security_present:\n            raise SentinelXError("Required independent security evidence is missing")\n', '        if False:\n            raise SentinelXError("Required independent security evidence is missing")\n', "required security oracle proposal"),
-            ('            elif policy.security_attestation_mode == REQUIRED_INDEPENDENT:\n                raise Repair("SECURITY_REQUIRED_MISSING")\n', '            elif False:\n                raise Repair("SECURITY_REQUIRED_MISSING")\n', "required security oracle capture"),
-        ]), probe_required_security, None),
+        Mutation(14, "make REQUIRED_INDEPENDENT accept no security artifact", governor, _mutate_required_contract, _mutate_required_oracle, probe_required_security, None),
         Mutation(15, "allow same-owner security publisher in REQUIRED_INDEPENDENT", governor, _source(
             '        if security_attestation_mode == SECURITY_REQUIRED_INDEPENDENT and self._raw_owner(source_prefix).lower() == self._raw_owner(security_prefix).lower():\n            raise gl.vm.UserError("Security publisher must be independent from source publisher")\n',
             '        if False:\n            raise gl.vm.UserError("Security publisher must be independent from source publisher")\n', "security independence"),
@@ -797,11 +1054,11 @@ def _mutations() -> tuple[Mutation, ...]:
             '        if self.used_evidence_ids.get(key, False):\n            raise gl.vm.UserError("Evidence identifier has already been used")\n',
             '        if False:\n            raise gl.vm.UserError("Evidence identifier has already been used")\n', "global evidence replay"), _source(
             '            if len(evidence_id) < 8 or evidence_id in self.used_evidence_ids:\n', '            if len(evidence_id) < 8:\n', "global evidence replay oracle"), probe_global_replay, gate_replay),
-        Mutation(28, "allow post-VERIFIED proposal mutation", governor, _source(
-            '        if proposal.status not in (STATUS_EVIDENCE_REPAIR_REQUIRED, STATUS_EVIDENCE_RETRY_REQUIRED, STATUS_REVIEW_RETRY_REQUIRED):\n',
-            '        if proposal.status not in (STATUS_EVIDENCE_REPAIR_REQUIRED, STATUS_EVIDENCE_RETRY_REQUIRED, STATUS_REVIEW_RETRY_REQUIRED, STATUS_VERIFIED):\n', "post verified mutation"), _source(
-            '        if caller != policy.owner or proposal.status not in (REPAIR, RETRY, EVIDENCE_RETRY):\n',
-            '        if caller != policy.owner or proposal.status not in (REPAIR, RETRY, EVIDENCE_RETRY, VERIFIED):\n', "post verified mutation oracle"), probe_post_verified_mutation, gate_post_verified),
+        Mutation(28, "allow post-VERIFIED proposal mutation", governor, _source_in_function("repair_evidence",
+            '        if proposal.status not in (\n            STATUS_EVIDENCE_STAGED,\n            STATUS_EVIDENCE_REPAIR_REQUIRED,\n            STATUS_EVIDENCE_RETRY_REQUIRED,\n            STATUS_REVIEW_RETRY_REQUIRED,\n        ):\n',
+            '        if proposal.status not in (\n            STATUS_EVIDENCE_STAGED,\n            STATUS_EVIDENCE_REPAIR_REQUIRED,\n            STATUS_EVIDENCE_RETRY_REQUIRED,\n            STATUS_REVIEW_RETRY_REQUIRED,\n            STATUS_VERIFIED,\n        ):\n', "post verified mutation"), _source(
+            '        if caller != policy.owner or proposal.status not in (EVIDENCE_STAGED, REPAIR, RETRY, EVIDENCE_RETRY):\n',
+            '        if caller != policy.owner or proposal.status not in (EVIDENCE_STAGED, REPAIR, RETRY, EVIDENCE_RETRY, VERIFIED):\n', "post verified mutation oracle"), probe_post_verified_mutation, gate_post_verified),
         Mutation(29, "set target registered flag before child succeeds", target, _source(
             '        SentinelXGovernorInterface(self.sentinelx_governor).emit(on="finalized").register_target(\n',
             '        self.registered_with_sentinelx = True\n        SentinelXGovernorInterface(self.sentinelx_governor).emit(on="finalized").register_target(\n',
@@ -841,6 +1098,93 @@ def _mutations() -> tuple[Mutation, ...]:
             '        if False:\n            raise gl.vm.UserError("Target policy is immutable and already registered")\n', "duplicate policy"), _source(
             '        if target in self.policies:\n            raise SentinelXError("Target policy is immutable")\n',
             '        if False:\n            raise SentinelXError("Target policy is immutable")\n', "duplicate policy oracle"), probe_duplicate_policy_registration, gate_duplicate_policy),
+        Mutation(36, "return parent bytes from compact nondet capture", governor, _source(
+            '        result["error_class"] = ""\n        result["parent_sha256"] = _sha256_hex(parent_bytes)\n',
+            '        result["error_class"] = ""\n        result["parent_bytes_hex"] = parent_bytes.hex()\n        result["parent_sha256"] = _sha256_hex(parent_bytes)\n', "compact parent output"),
+            _source('            "result_kind": "CAPTURE", "error_class": "",\n',
+                    '            "result_kind": "CAPTURE", "error_class": "",\n            "parent_bytes_hex": parent.hex(),\n', "compact parent output oracle"),
+            lambda m: probe_compact_output(m, "parent_bytes_hex"), gate_compact_output),
+        Mutation(37, "return candidate bytes from compact nondet capture", governor, _source(
+            '        result["candidate_sha256"] = _sha256_hex(candidate_bytes)\n',
+            '        result["candidate_bytes_hex"] = candidate_bytes.hex()\n        result["candidate_sha256"] = _sha256_hex(candidate_bytes)\n', "compact candidate output"),
+            _source('            "parent_sha256": sha256_hex(parent), "parent_length": len(parent),\n',
+                    '            "parent_sha256": sha256_hex(parent), "parent_length": len(parent),\n            "candidate_bytes_hex": candidate.hex(),\n', "compact candidate output oracle"),
+            lambda m: probe_compact_output(m, "candidate_bytes_hex"), gate_compact_output),
+        Mutation(38, "return CI bytes from compact nondet capture", governor, _source(
+            '        result["ci_sha256"] = _sha256_hex(ci_bytes)\n',
+            '        result["ci_bytes_hex"] = ci_bytes.hex()\n        result["ci_sha256"] = _sha256_hex(ci_bytes)\n', "compact CI output"),
+            _source('            "candidate_sha256": sha256_hex(candidate), "candidate_length": len(candidate),\n',
+                    '            "candidate_sha256": sha256_hex(candidate), "candidate_length": len(candidate),\n            "ci_bytes_hex": ci_raw.hex(),\n', "compact CI output oracle"),
+            lambda m: probe_compact_output(m, "ci_bytes_hex"), gate_compact_output),
+        Mutation(39, "skip deterministic staged-parent hash validation", governor, _source(
+            '        if _sha256_hex(parent_source_bytes) != proposal.parent_code_hash:\n            raise gl.vm.UserError("Staged parent source hash does not match proposal")\n',
+            '        if False:\n            raise gl.vm.UserError("Staged parent source hash does not match proposal")\n', "staged parent hash"),
+            _source('        if sha256_hex(parent_source_bytes) != proposal.parent_code_hash:\n            raise SentinelXError("Staged parent source hash does not match proposal")\n',
+                    '        if False:\n            raise SentinelXError("Staged parent source hash does not match proposal")\n', "staged parent hash oracle"), probe_staging_parent_validation, gate_stage_parent),
+        Mutation(40, "skip authenticated staged-CI hash validation", governor, _source(
+            '        if _sha256_hex(staged.ci_evidence_bytes) != staged.ci_evidence_hash:\n            return False\n',
+            '        if False:\n            return False\n', "staged CI hash"),
+            _source('            and sha256_hex(staged.ci_evidence_bytes) == staged.ci_hash\n',
+                    '            and True\n', "staged CI hash oracle"), probe_staged_ci_integrity, gate_staged_ci),
+        Mutation(41, "allow remote parent hash to differ from staged bytes", governor, _source_many([
+            ('        if _sha256_hex(parent_bytes) != proposal.parent_code_hash:\n            return self._capture_error(proposal, "PARENT_SOURCE_HASH_MISMATCH")\n',
+             '        if False:\n            return self._capture_error(proposal, "PARENT_SOURCE_HASH_MISMATCH")\n', "remote parent hash"),
+            ('            "parent_sha256": staged.parent_source_hash,\n',
+             '            # MUTANT omitted parent remote-to-stage binding\n', "remote parent stage binding"),
+        ]), _source_many([
+            ('            if sha256_hex(parent) != proposal.parent_code_hash:\n                raise Repair("PARENT_SOURCE_HASH_MISMATCH")\n',
+             '            if False:\n                raise Repair("PARENT_SOURCE_HASH_MISMATCH")\n', "remote parent hash oracle"),
+            ('            "parent_sha256": staged.parent_hash, "parent_length": len(staged.parent_source_bytes),\n',
+             '            "parent_length": len(staged.parent_source_bytes),\n', "remote parent stage binding oracle"),
+        ]), probe_remote_parent_binding, gate_remote_parent),
+        Mutation(42, "allow remote CI hash to differ from staged bytes", governor, _source(
+            '            "ci_sha256": staged.ci_evidence_hash,\n',
+            '            "ci_length": len(staged.ci_evidence_bytes),\n', "remote CI stage binding"),
+            _source('            "ci_sha256": staged.ci_hash, "ci_length": len(staged.ci_evidence_bytes),\n',
+                    '            "ci_length": len(staged.ci_evidence_bytes),\n', "remote CI stage binding oracle"), probe_remote_ci_binding, gate_remote_ci),
+        Mutation(43, "allow remote candidate hash to differ from frozen bytes", governor, _source_many([
+            ('        if _sha256_hex(candidate_bytes) != proposal.candidate_code_hash:\n            return self._capture_error(proposal, "CANDIDATE_SOURCE_HASH_MISMATCH")\n        if _sha256_hex(proposal.candidate_code) != proposal.candidate_code_hash:\n            return self._capture_error(proposal, "FROZEN_CANDIDATE_HASH_MISMATCH")\n        if candidate_bytes != proposal.candidate_code:\n            return self._capture_error(proposal, "CANDIDATE_BYTES_MISMATCH")\n',
+             '        if False:\n            return self._capture_error(proposal, "CANDIDATE_SOURCE_HASH_MISMATCH")\n', "remote candidate hash"),
+            ('            "candidate_sha256": proposal.candidate_code_hash,\n',
+             '            # MUTANT omitted candidate remote-to-frozen binding\n', "remote candidate frozen binding"),
+        ]), _source_many([
+            ('            if sha256_hex(candidate) != proposal.candidate_code_hash or candidate != proposal.candidate_code:\n                raise Repair("CANDIDATE_BYTES_MISMATCH")\n',
+             '            if False:\n                raise Repair("CANDIDATE_BYTES_MISMATCH")\n', "remote candidate hash oracle"),
+            ('            "candidate_sha256": proposal.candidate_code_hash, "candidate_length": len(proposal.candidate_code),\n',
+             '            "candidate_length": len(proposal.candidate_code),\n', "remote candidate frozen binding oracle"),
+        ]), probe_remote_candidate_binding, gate_remote_candidate),
+        Mutation(44, "mark evidence ready immediately after staging", governor, _source(
+            '        proposal.status = STATUS_EVIDENCE_STAGED\n',
+            '        proposal.status = STATUS_EVIDENCE_READY\n', "stage lifecycle"),
+            _source('        proposal.status, proposal.last_code = EVIDENCE_STAGED, "EVIDENCE_STAGED"\n',
+                    '        proposal.status, proposal.last_code = EVIDENCE_READY, "EVIDENCE_STAGED"\n', "stage lifecycle oracle"), probe_stage_not_ready, gate_stage_not_ready),
+        Mutation(45, "allow staged evidence overwrite after capture", governor, _source_many_in_function(
+            "stage_evidence", [
+                ('        if proposal.evidence_set_hash in self.evidence_snapshots:\n            raise gl.vm.UserError("Evidence snapshot is write-once and already exists")\n',
+                 '        if False:\n            raise gl.vm.UserError("Evidence snapshot is write-once and already exists")\n', "staged overwrite snapshot"),
+                ('        if proposal.evidence_set_hash in self.staged_evidence:\n            raise gl.vm.UserError("Evidence staging is write-once and already exists")\n',
+                 '        if False:\n            raise gl.vm.UserError("Evidence staging is write-once and already exists")\n', "staged overwrite record"),
+            ]), _source_many_in_function("stage_evidence", [
+                ('        if proposal.evidence_identity in self.snapshots:\n            raise SentinelXError("Evidence snapshot is write-once")\n',
+                 '        if False:\n            raise SentinelXError("Evidence snapshot is write-once")\n', "staged overwrite snapshot oracle"),
+                ('        if proposal.evidence_identity in self.staged:\n            raise SentinelXError("Evidence staging is write-once")\n',
+                 '        if False:\n            raise SentinelXError("Evidence staging is write-once")\n', "staged overwrite record oracle"),
+            ]), probe_staged_overwrite, gate_staged_overwrite),
+        Mutation(46, "make V2.2 evidence identity depend on transport URL", governor, _source(
+            '                "evidence-identity",\n                str(proposal.proposal_id),\n',
+            '                "evidence-identity",\n                proposal.candidate_source_url,\n                str(proposal.proposal_id),\n', "V2.2 transport identity"),
+            _source('            "sentinelx-governor-v2", "evidence-identity", str(proposal_id), target,\n',
+                    '            "sentinelx-governor-v2", "evidence-identity", str(proposal_id), target, candidate_source_url,\n', "V2.2 transport identity oracle"), probe_transport_identity, gate_transport_identity),
+        Mutation(47, "allow a mismatching security mirror", governor, _source(
+            '            "security_sha256": staged.security_evidence_hash,\n',
+            '            "security_length": len(staged.security_evidence_bytes),\n', "security mirror binding"),
+            _source('            "security_sha256": staged.security_hash, "security_length": len(staged.security_evidence_bytes),\n',
+                    '            "security_length": len(staged.security_evidence_bytes),\n', "security mirror binding oracle"), probe_security_mirror_binding, gate_security_binding),
+        Mutation(48, "permit semantic review from unattested staged evidence", governor, _source(
+            '        if proposal.status not in (STATUS_EVIDENCE_READY, STATUS_REVIEW_RETRY_REQUIRED):\n',
+            '        if proposal.status not in (STATUS_EVIDENCE_STAGED, STATUS_EVIDENCE_READY, STATUS_REVIEW_RETRY_REQUIRED):\n', "unattested review lifecycle"),
+            _source('        if caller != policy.owner or proposal.status not in (EVIDENCE_READY, RETRY):\n',
+                    '        if caller != policy.owner or proposal.status not in (EVIDENCE_STAGED, EVIDENCE_READY, RETRY):\n', "unattested review lifecycle oracle"), probe_unattested_review, gate_unattested_review),
     )
 
 

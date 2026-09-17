@@ -24,6 +24,7 @@ from .sentinelx_model import (
 OPTIONAL = "OPTIONAL"
 REQUIRED_INDEPENDENT = "REQUIRED_INDEPENDENT"
 EVIDENCE_READY = "EVIDENCE_READY"
+EVIDENCE_STAGED = "EVIDENCE_STAGED"
 EVIDENCE_RETRY = "EVIDENCE_RETRY_REQUIRED"
 PROPOSED = "PROPOSED"
 REPAIR = "EVIDENCE_REPAIR_REQUIRED"
@@ -32,6 +33,9 @@ REJECTED = "REJECTED"
 QUEUED = "UPGRADE_QUEUED"
 VERIFIED = "VERIFIED"
 EXECUTION_FAILED = "EXECUTION_FAILED"
+MAX_PARENT_SOURCE_BYTES = 16_384
+MAX_CI_EVIDENCE_BYTES = 16_384
+MAX_SECURITY_EVIDENCE_BYTES = 32_768
 
 
 def _hash_parts(*parts: str) -> str:
@@ -114,10 +118,33 @@ class V2Snapshot:
     security_present: bool
     policy_fingerprint: str
     parent_hash: str
+    parent_length: int
     candidate_hash: str
+    candidate_length: int
     ci_hash: str
+    ci_length: int
     security_hash: str
+    security_length: int
     snapshot_digest: str
+
+
+@dataclass
+class V2StagedEvidence:
+    proposal_id: int
+    target: str
+    evidence_identity: str
+    parent_source_bytes: bytes
+    parent_hash: str
+    ci_evidence_bytes: bytes
+    ci_hash: str
+    ci_evidence_id: str
+    security_evidence_bytes: bytes
+    security_hash: str
+    security_evidence_id: str
+    security_present: bool
+    policy_fingerprint: str
+    staged_at: int
+    staged_digest: str
 
 
 class Retry(Exception):
@@ -134,6 +161,7 @@ class SentinelXV2Model:
         self.policies: dict[str, V2Policy] = {}
         self.proposals: dict[int, V2Proposal] = {}
         self.snapshots: dict[str, V2Snapshot] = {}
+        self.staged: dict[str, V2StagedEvidence] = {}
         self.active: dict[str, int] = {}
         self.used_evidence_ids: set[str] = set()
         self.review_web_fetches: dict[int, int] = {}
@@ -306,20 +334,149 @@ class SentinelXV2Model:
 
     def _snapshot_digest(self, snapshot: V2Snapshot) -> str:
         return _hash_parts(
-            "sentinelx-evidence-snapshot-v2", str(snapshot.proposal_id),
+            "sentinelx-evidence-snapshot-v3", str(snapshot.proposal_id),
             snapshot.target, snapshot.evidence_identity, snapshot.parent_hash,
-            snapshot.candidate_hash, snapshot.ci_evidence_id, snapshot.ci_hash,
+            str(snapshot.parent_length), snapshot.candidate_hash,
+            str(snapshot.candidate_length), snapshot.ci_evidence_id,
+            snapshot.ci_hash, str(snapshot.ci_length),
             snapshot.security_evidence_id, snapshot.security_hash,
+            str(snapshot.security_length),
             "1" if snapshot.security_present else "0", snapshot.policy_fingerprint,
         )
+
+    def _staged_digest(self, staged: V2StagedEvidence) -> str:
+        return _hash_parts(
+            "sentinelx-staged-evidence-v2", str(staged.proposal_id), staged.target,
+            staged.evidence_identity, staged.parent_hash,
+            str(len(staged.parent_source_bytes)), staged.ci_evidence_id,
+            staged.ci_hash, str(len(staged.ci_evidence_bytes)),
+            staged.security_evidence_id, staged.security_hash,
+            str(len(staged.security_evidence_bytes)),
+            "1" if staged.security_present else "0", staged.policy_fingerprint,
+        )
+
+    def stage_evidence(
+        self, proposal_id: int, *, parent_source_bytes: bytes,
+        ci_evidence_bytes: bytes, security_evidence_bytes: bytes = b"",
+        caller: str,
+    ) -> None:
+        proposal = self.proposals[proposal_id]
+        policy = self.policies[proposal.target]
+        if caller != policy.owner:
+            raise SentinelXError("Only the registered target owner may perform this action")
+        if proposal.evidence_identity in self.snapshots:
+            raise SentinelXError("Evidence snapshot is write-once")
+        if proposal.evidence_identity in self.staged:
+            raise SentinelXError("Evidence staging is write-once")
+        if proposal.status not in (PROPOSED, REPAIR, EVIDENCE_RETRY):
+            raise SentinelXError("Proposal is not ready for evidence staging")
+        if policy.current_code_hash != proposal.parent_code_hash:
+            raise SentinelXError("Proposal parent is no longer current")
+        if not isinstance(parent_source_bytes, bytes) or not parent_source_bytes or len(parent_source_bytes) > MAX_PARENT_SOURCE_BYTES:
+            raise SentinelXError("Parent source bytes are empty or too large")
+        if not isinstance(ci_evidence_bytes, bytes) or not ci_evidence_bytes or len(ci_evidence_bytes) > MAX_CI_EVIDENCE_BYTES:
+            raise SentinelXError("CI evidence bytes are empty or too large")
+        if not isinstance(security_evidence_bytes, bytes) or len(security_evidence_bytes) > MAX_SECURITY_EVIDENCE_BYTES:
+            raise SentinelXError("Security evidence bytes are too large")
+        if sha256_hex(parent_source_bytes) != proposal.parent_code_hash:
+            raise SentinelXError("Staged parent source hash does not match proposal")
+        if sha256_hex(proposal.candidate_code) != proposal.candidate_code_hash:
+            raise SentinelXError("Frozen candidate hash is invalid")
+        try:
+            parent_source_bytes.decode()
+            proposal.candidate_code.decode()
+            ci = json.loads(ci_evidence_bytes)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise SentinelXError("Staged source or CI evidence is not valid UTF-8 JSON")
+        error = self._evidence_error(ci, "ci", proposal.ci_evidence_id,
+                                     policy.ci_authority, proposal)
+        if error:
+            raise SentinelXError("CI " + error)
+        checks = ci.get("checks") if isinstance(ci, dict) else None
+        required_ci = ("genvm_lint", "typecheck", "schema", "direct_tests",
+                       "adversarial_tests", "source_parity", "transaction_safety")
+        if (not isinstance(checks, dict) or set(checks) != set(required_ci)
+                or any(checks[k] is not True for k in required_ci)):
+            raise SentinelXError("CI checks are invalid")
+        security_present = bool(proposal.security_evidence_url) or bool(proposal.security_evidence_id)
+        if security_present != bool(security_evidence_bytes):
+            raise SentinelXError("Security evidence bytes do not match artifact presence")
+        if policy.security_attestation_mode == REQUIRED_INDEPENDENT and not security_present:
+            raise SentinelXError("Required independent security evidence is missing")
+        if security_present:
+            try:
+                security = json.loads(security_evidence_bytes)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                raise SentinelXError("Security evidence JSON is invalid")
+            error = self._evidence_error(security, "security", proposal.security_evidence_id,
+                                         policy.security_authority, proposal)
+            if error:
+                raise SentinelXError("SECURITY_" + error)
+            if policy.security_attestation_mode == REQUIRED_INDEPENDENT and (
+                    security.get("verdict") != "PASS"
+                    or security.get("independent_review") is not True):
+                raise SentinelXError("Security evidence is not independently passing")
+        staged = V2StagedEvidence(
+            proposal_id, proposal.target, proposal.evidence_identity,
+            parent_source_bytes, sha256_hex(parent_source_bytes),
+            ci_evidence_bytes, sha256_hex(ci_evidence_bytes), proposal.ci_evidence_id,
+            security_evidence_bytes if security_present else b"",
+            sha256_hex(security_evidence_bytes) if security_present else "",
+            proposal.security_evidence_id, security_present,
+            proposal.policy_fingerprint, self.now, "",
+        )
+        staged.staged_digest = self._staged_digest(staged)
+        self.staged[proposal.evidence_identity] = staged
+        proposal.status, proposal.last_code = EVIDENCE_STAGED, "EVIDENCE_STAGED"
+
+    def _staged_intact(self, proposal: V2Proposal, staged: V2StagedEvidence) -> bool:
+        policy = self.policies[proposal.target]
+        expected_security = bool(proposal.security_evidence_url) or bool(proposal.security_evidence_id)
+        return (
+            staged.proposal_id == proposal.proposal_id
+            and staged.target == proposal.target
+            and staged.evidence_identity == proposal.evidence_identity
+            and staged.policy_fingerprint == proposal.policy_fingerprint
+            and staged.parent_hash == proposal.parent_code_hash
+            and sha256_hex(staged.parent_source_bytes) == staged.parent_hash
+            and sha256_hex(staged.ci_evidence_bytes) == staged.ci_hash
+            and staged.security_present == expected_security
+            and (not staged.security_present or sha256_hex(staged.security_evidence_bytes) == staged.security_hash)
+            and (policy.security_attestation_mode != REQUIRED_INDEPENDENT or staged.security_present)
+            and staged.staged_digest == self._staged_digest(staged)
+        )
+
+    def _compact_capture_result(self, proposal: V2Proposal, parent: bytes,
+                                candidate: bytes, ci_raw: bytes,
+                                security_raw: bytes, security_present: bool) -> dict[str, Any]:
+        return {
+            "result_kind": "CAPTURE", "error_class": "",
+            "proposal_id": proposal.proposal_id, "target": proposal.target,
+            "parent_hash": proposal.parent_code_hash,
+            "candidate_hash": proposal.candidate_code_hash,
+            "policy_fingerprint": proposal.policy_fingerprint,
+            "evidence_identity": proposal.evidence_identity,
+            "parent_sha256": sha256_hex(parent), "parent_length": len(parent),
+            "candidate_sha256": sha256_hex(candidate), "candidate_length": len(candidate),
+            "ci_sha256": sha256_hex(ci_raw), "ci_length": len(ci_raw),
+            "security_sha256": sha256_hex(security_raw) if security_present else "",
+            "security_length": len(security_raw) if security_present else 0,
+            "security_present": security_present,
+        }
 
     def capture_evidence(self, proposal_id: int, *, web: dict[str, Any], caller: str) -> str:
         proposal = self.proposals[proposal_id]
         policy = self.policies[proposal.target]
         if proposal.evidence_identity in self.snapshots:
             raise SentinelXError("Evidence snapshot is write-once")
-        if caller != policy.owner or proposal.status not in (PROPOSED, REPAIR):
+        if caller != policy.owner or proposal.status not in (PROPOSED, EVIDENCE_STAGED, REPAIR, EVIDENCE_RETRY):
             raise SentinelXError("Proposal is not ready for evidence capture")
+        staged = self.staged.get(proposal.evidence_identity)
+        if staged is None:
+            raise SentinelXError("Evidence must be staged before capture")
+        if not self._staged_intact(proposal, staged):
+            proposal.status, proposal.last_code = REPAIR, "STAGED_EVIDENCE_HASH_MISMATCH"
+            return proposal.status
         try:
             parent = self._fetch(web, proposal.parent_source_url)
             candidate = self._fetch(web, proposal.candidate_source_url)
@@ -359,14 +516,29 @@ class SentinelXV2Model:
         except (Repair, KeyError, json.JSONDecodeError, UnicodeDecodeError) as error:
             proposal.status, proposal.last_code = REPAIR, str(error)
             return proposal.status
+        compact = self._compact_capture_result(
+            proposal, parent, candidate, ci_raw, security_raw, security_present
+        )
+        expected = {
+            "parent_sha256": staged.parent_hash, "parent_length": len(staged.parent_source_bytes),
+            "candidate_sha256": proposal.candidate_code_hash, "candidate_length": len(proposal.candidate_code),
+            "ci_sha256": staged.ci_hash, "ci_length": len(staged.ci_evidence_bytes),
+            "security_sha256": staged.security_hash, "security_length": len(staged.security_evidence_bytes),
+            "security_present": staged.security_present,
+        }
+        if any(compact[key] != value for key, value in expected.items()):
+            proposal.status, proposal.last_code = REPAIR, "CAPTURE_ATTESTATION_MISMATCH"
+            return proposal.status
         snapshot = V2Snapshot(
             proposal_id, proposal.target, proposal.evidence_identity,
-            proposal.parent_source_url, parent, proposal.candidate_source_url,
-            candidate, proposal.ci_evidence_url, proposal.ci_evidence_id, ci_raw,
+            proposal.parent_source_url, staged.parent_source_bytes, proposal.candidate_source_url,
+            proposal.candidate_code, proposal.ci_evidence_url, proposal.ci_evidence_id,
+            staged.ci_evidence_bytes,
             proposal.security_evidence_url, proposal.security_evidence_id,
-            security_raw, security_present, proposal.policy_fingerprint,
-            sha256_hex(parent), sha256_hex(candidate), sha256_hex(ci_raw),
-            sha256_hex(security_raw) if security_present else "", "",
+            staged.security_evidence_bytes, security_present, proposal.policy_fingerprint,
+            compact["parent_sha256"], compact["parent_length"], compact["candidate_sha256"],
+            compact["candidate_length"], compact["ci_sha256"], compact["ci_length"],
+            compact["security_sha256"], compact["security_length"], "",
         )
         snapshot = V2Snapshot(**{**snapshot.__dict__, "snapshot_digest": self._snapshot_digest(snapshot)})
         self.snapshots[proposal.evidence_identity] = snapshot
@@ -384,6 +556,10 @@ class SentinelXV2Model:
             and snapshot.policy_fingerprint == proposal.policy_fingerprint
             and snapshot.parent_hash == proposal.parent_code_hash
             and snapshot.candidate_hash == proposal.candidate_code_hash
+            and snapshot.parent_length == len(snapshot.parent_source_bytes)
+            and snapshot.candidate_length == len(snapshot.candidate_source_bytes)
+            and snapshot.ci_length == len(snapshot.ci_evidence_bytes)
+            and snapshot.security_length == len(snapshot.security_evidence_bytes)
             and sha256_hex(snapshot.parent_source_bytes) == snapshot.parent_hash
             and sha256_hex(snapshot.candidate_source_bytes) == snapshot.candidate_hash
             and snapshot.candidate_source_bytes == proposal.candidate_code
@@ -456,7 +632,7 @@ class SentinelXV2Model:
                         caller: str) -> None:
         proposal = self.proposals[proposal_id]
         policy = self.policies[proposal.target]
-        if caller != policy.owner or proposal.status not in (REPAIR, RETRY, EVIDENCE_RETRY):
+        if caller != policy.owner or proposal.status not in (EVIDENCE_STAGED, REPAIR, RETRY, EVIDENCE_RETRY):
             raise SentinelXError("Proposal is not awaiting evidence repair")
         if not immutable_url(candidate_source_url, policy.source_prefix) or not immutable_url(ci_evidence_url, policy.ci_prefix):
             raise SentinelXError("Replacement source is not immutable")
