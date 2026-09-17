@@ -89,6 +89,8 @@ REQUESTED_METHODS = (
 
 
 def _json_safe(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
     if isinstance(value, dict):
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
@@ -97,7 +99,11 @@ def _json_safe(value: Any) -> Any:
         return "0x" + value.hex()
     if hasattr(value, "value"):
         return _json_safe(value.value)
-    return value
+    # genlayer-py can return typed calldata scalar wrappers (notably address
+    # values) which are public readback values but are not JSON encoders. Do
+    # not lose the readback or let this bookkeeping failure interrupt a
+    # journaled lifecycle; normalize such scalars to their public text form.
+    return str(value)
 
 
 def _read_run() -> dict[str, Any]:
