@@ -40,6 +40,15 @@ def _hash_parts(*parts: str) -> str:
     return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
 
 
+def _optional_wire_text(value: str | int) -> str:
+    """Normalize the v0.6 zero sentinel used for omitted optional strings."""
+    if value == 0:
+        return ""
+    if not isinstance(value, str):
+        raise SentinelXError("Optional evidence field must be a string or zero")
+    return value
+
+
 @dataclass(frozen=True)
 class V2Policy:
     owner: str
@@ -200,7 +209,7 @@ class SentinelXV2Model:
     def create_proposal(
         self, *, target: str, candidate_version: str, candidate_source_url: str,
         candidate_code: bytes, ci_evidence_url: str, ci_evidence_id: str,
-        security_evidence_url: str = "", security_evidence_id: str = "",
+        security_evidence_url: str | int = "", security_evidence_id: str | int = "",
         release_intent: str = "safe compatible release", caller: str,
     ) -> V2Proposal:
         if target not in self.policies:
@@ -214,6 +223,10 @@ class SentinelXV2Model:
             raise SentinelXError("Candidate source is not immutable")
         if not immutable_url(ci_evidence_url, policy.ci_prefix):
             raise SentinelXError("CI evidence source is not immutable")
+        # Match the v0.6 wire behavior: omitted optional strings may arrive as
+        # integer zero, but proposal storage and hashing require strings.
+        security_evidence_url = _optional_wire_text(security_evidence_url)
+        security_evidence_id = _optional_wire_text(security_evidence_id)
         security_present = bool(security_evidence_url) or bool(security_evidence_id)
         if bool(security_evidence_url) != bool(security_evidence_id):
             raise SentinelXError("Security evidence URL and ID must be paired")
@@ -439,7 +452,7 @@ class SentinelXV2Model:
 
     def repair_evidence(self, proposal_id: int, *, candidate_source_url: str,
                         ci_evidence_url: str, ci_evidence_id: str,
-                        security_evidence_url: str = "", security_evidence_id: str = "",
+                        security_evidence_url: str | int = "", security_evidence_id: str | int = "",
                         caller: str) -> None:
         proposal = self.proposals[proposal_id]
         policy = self.policies[proposal.target]
@@ -447,6 +460,8 @@ class SentinelXV2Model:
             raise SentinelXError("Proposal is not awaiting evidence repair")
         if not immutable_url(candidate_source_url, policy.source_prefix) or not immutable_url(ci_evidence_url, policy.ci_prefix):
             raise SentinelXError("Replacement source is not immutable")
+        security_evidence_url = _optional_wire_text(security_evidence_url)
+        security_evidence_id = _optional_wire_text(security_evidence_id)
         present = bool(security_evidence_url) or bool(security_evidence_id)
         if bool(security_evidence_url) != bool(security_evidence_id):
             raise SentinelXError("Replacement security fields must be paired")

@@ -415,7 +415,7 @@ def main() -> int:
         raise SystemExit("managed V2.1 profiling requires SENTINELX_ALLOW_BROADCAST=1")
     if not re.fullmatch(r"[0-9a-f]{40}", SOURCE_REVISION):
         raise SystemExit("SENTINELX_V21_SOURCE_REVISION must be the pushed 40-character Git SHA")
-    for path, expected in ((GOVERNOR_SOURCE, "3dbe0090d754e89a010cc8af239511c4a57e9626af555fa968076ea31098153e"), (TARGET_SOURCE, PARENT_HASH), (SAFE_SOURCE, SAFE_HASH), (UNSAFE_SOURCE, UNSAFE_HASH)):
+    for path, expected in ((GOVERNOR_SOURCE, "1781c126e3b64cff297eaf58d0fe7ce7cc5195850216b3e457e3f68f29c33ffc"), (TARGET_SOURCE, PARENT_HASH), (SAFE_SOURCE, SAFE_HASH), (UNSAFE_SOURCE, UNSAFE_HASH)):
         if source_sha256(path) != expected:
             raise SystemExit(f"V2.1 source hash mismatch: {path}")
     from scripts.v2_source_manifest import verify_manifest

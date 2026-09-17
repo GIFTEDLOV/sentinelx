@@ -218,6 +218,24 @@ def test_optional_wire_zero_is_normalized_to_explicit_security_absence():
     assert policy.security_prefix == ""
 
 
+def test_optional_proposal_wire_zero_is_normalized_before_storage():
+    model = SentinelXV2Model(NOW)
+    register(model)
+    proposal = model.create_proposal(
+        target=TARGET,
+        candidate_version="2.0.1",
+        candidate_source_url=CANDIDATE_URL,
+        candidate_code=CANDIDATE,
+        ci_evidence_url=CI_URL,
+        ci_evidence_id="ci-wire-zero-001",
+        security_evidence_url=0,
+        security_evidence_id=0,
+        caller=OWNER,
+    )
+    assert proposal.security_evidence_url == ""
+    assert proposal.security_evidence_id == ""
+
+
 def test_optional_proposal_reaches_evidence_ready_without_security_artifact():
     model, proposal = prepared()
     assert model.capture_evidence(proposal.proposal_id, web=web_for(proposal), caller=OWNER) == EVIDENCE_READY

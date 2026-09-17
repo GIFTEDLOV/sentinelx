@@ -1284,6 +1284,13 @@ class SentinelXGovernor(gl.contract.Contract):
             raise gl.vm.UserError("Candidate source is not immutable and approved")
         if not self._is_immutable_url(ci_evidence_url, policy.ci_prefix):
             raise gl.vm.UserError("CI evidence source is not immutable and approved")
+        # The v0.6 wire decoder represents omitted optional string arguments as
+        # integer zero. Normalize that ABI sentinel before any string-backed
+        # proposal storage or hashing is performed.
+        if not security_evidence_url:
+            security_evidence_url = ""
+        if not security_evidence_id:
+            security_evidence_id = ""
         security_supplied = bool(security_evidence_url) or bool(security_evidence_id)
         if bool(security_evidence_url) != bool(security_evidence_id):
             raise gl.vm.UserError("Security evidence URL and ID must be paired")
@@ -1359,6 +1366,12 @@ class SentinelXGovernor(gl.contract.Contract):
             raise gl.vm.UserError("Replacement candidate source is not approved")
         if not self._is_immutable_url(ci_evidence_url, policy.ci_prefix):
             raise gl.vm.UserError("Replacement CI evidence source is not approved")
+        # Keep recovery compatible with the same v0.6 optional-string wire
+        # representation handled by create_proposal.
+        if not security_evidence_url:
+            security_evidence_url = ""
+        if not security_evidence_id:
+            security_evidence_id = ""
         security_supplied = bool(security_evidence_url) or bool(security_evidence_id)
         if bool(security_evidence_url) != bool(security_evidence_id):
             raise gl.vm.UserError("Replacement security evidence URL and ID must be paired")

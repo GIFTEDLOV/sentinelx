@@ -31,7 +31,7 @@ CONTRACTS = (
     ROOT / "contracts" / "protected_app_v2_unsafe.py",
 )
 FROZEN_HASHES = {
-    "sentinelx_governor.py": "3dbe0090d754e89a010cc8af239511c4a57e9626af555fa968076ea31098153e",
+    "sentinelx_governor.py": "1781c126e3b64cff297eaf58d0fe7ce7cc5195850216b3e457e3f68f29c33ffc",
     "protected_app_v1.py": "470c9a72c63f8ca345956299edc530bc92924eaa1708c05a767b141df05d1c4f",
     "protected_app_v2_safe.py": "72c240f0725dc314429d01f051d4b40dc906623f48ba2b38514824d7f46011e5",
     "protected_app_v2_unsafe.py": "6b3f7a0ebae0f097036f33b57b77b1d10ae2d813b7330e34ba1dab33a5010653",
