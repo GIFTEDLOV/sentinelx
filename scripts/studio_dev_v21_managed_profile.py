@@ -547,18 +547,33 @@ def main() -> int:
         )
     except RuntimeError as error:
         duplicate_error = str(error)
-    duplicate_record = _operation_record(journal_obj, duplicate_operation)
-    if duplicate_record.get("state") != "FINALIZED_EXECUTION_FAILED":
-        raise SystemExit("duplicate registration did not finalize as a deterministic failure")
-    if duplicate_record.get("triggered_transaction_ids"):
-        raise SystemExit("duplicate registration emitted an unexpected governor child")
-    run["duplicate_registration"] = {
-        "error": duplicate_error,
-        "tx_hash": duplicate_record.get("tx_hash"),
-        "state": duplicate_record.get("state"),
-        "execution_result": duplicate_record.get("execution_result"),
-        "triggered_transaction_ids": duplicate_record.get("triggered_transaction_ids", []),
-    }
+    duplicate_record = journal_obj.load()["operations"].get(duplicate_operation)
+    if duplicate_record is None:
+        # Studio's fee simulation executes the target precondition and can
+        # reject this duplicate before the bridge reserves or broadcasts a
+        # transaction.  That is the strongest outcome: no second governor
+        # child exists and no duplicate broadcast occurred.
+        if not duplicate_error:
+            raise SystemExit("duplicate registration was neither blocked nor journaled")
+        run["duplicate_registration"] = {
+            "error": duplicate_error,
+            "tx_hash": None,
+            "state": "BLOCKED_BEFORE_BROADCAST",
+            "execution_result": None,
+            "triggered_transaction_ids": [],
+        }
+    else:
+        if duplicate_record.get("state") != "FINALIZED_EXECUTION_FAILED":
+            raise SystemExit("duplicate registration did not finalize as a deterministic failure")
+        if duplicate_record.get("triggered_transaction_ids"):
+            raise SystemExit("duplicate registration emitted an unexpected governor child")
+        run["duplicate_registration"] = {
+            "error": duplicate_error,
+            "tx_hash": duplicate_record.get("tx_hash"),
+            "state": duplicate_record.get("state"),
+            "execution_result": duplicate_record.get("execution_result"),
+            "triggered_transaction_ids": duplicate_record.get("triggered_transaction_ids", []),
+        }
     _save_run(run)
 
     # Separate recovery target: a malformed child must leave both governor
