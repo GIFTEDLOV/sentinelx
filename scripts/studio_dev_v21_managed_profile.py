@@ -513,15 +513,25 @@ def main() -> int:
         3_600,
         3_600,
     ]
-    run["safe_registration_governor_before"] = read(client, governor, "is_target_registered", [safe_target])
-    run["safe_registration_target_before"] = read(client, safe_target, "is_registered_with_sentinelx")
-    if run["safe_registration_governor_before"] is not False or run["safe_registration_target_before"] is not False:
-        raise SystemExit("fresh V2.1 target was already registered before registration proof")
-    registration = _submit_and_track(
-        client=client, journal_obj=journal_obj, operation=SAFE_REGISTRATION_OPERATION,
-        kind="method", method="register_with_sentinelx", address=safe_target,
-        args=registration_args, child_methods=["register_target"],
-    )
+    registration_record = journal_obj.load()["operations"].get(SAFE_REGISTRATION_OPERATION)
+    if registration_record is None:
+        run["safe_registration_governor_before"] = read(client, governor, "is_target_registered", [safe_target])
+        run["safe_registration_target_before"] = read(client, safe_target, "is_registered_with_sentinelx")
+        if run["safe_registration_governor_before"] is not False or run["safe_registration_target_before"] is not False:
+            raise SystemExit("fresh V2.1 target was already registered before registration proof")
+        registration = _submit_and_track(
+            client=client, journal_obj=journal_obj, operation=SAFE_REGISTRATION_OPERATION,
+            kind="method", method="register_with_sentinelx", address=safe_target,
+            args=registration_args, child_methods=["register_target"],
+        )
+    else:
+        if registration_record.get("state") != "FINALIZED_EXECUTED":
+            raise SystemExit("existing V2.1 registration parent is not finalized successfully")
+        registration = _submit_and_track(
+            client=client, journal_obj=journal_obj, operation=SAFE_REGISTRATION_OPERATION,
+            kind="method", method="register_with_sentinelx", address=safe_target,
+            args=registration_args, child_methods=["register_target"],
+        )
     _tag(journal_obj, SAFE_REGISTRATION_OPERATION, method="register_with_sentinelx")
     run["registration_tx"] = registration["tx_hash"]
     policy = read_json(client, governor, "get_target_policy", [safe_target])
