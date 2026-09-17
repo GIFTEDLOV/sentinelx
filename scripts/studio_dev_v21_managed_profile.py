@@ -349,7 +349,7 @@ def _write_outputs(run: dict[str, Any], journal_obj: Any, preflight: dict[str, A
         "network": {"name": NETWORK, "rpc": RPC, "chain_id": CHAIN_ID, "profile_only": True},
         "toolchain": run.get("toolchain", {}),
         "gates": {
-            "direct_tests": {"count": 122, "result": "PASS"},
+            "direct_tests": {"count": 123, "result": "PASS"},
             "mutation_tests": {"count": 35, "killed": 35, "result": "PASS", "surviving": []},
             "static_lint": "PASS",
             "semantic_validation": "PASS",
@@ -415,7 +415,7 @@ def main() -> int:
         raise SystemExit("managed V2.1 profiling requires SENTINELX_ALLOW_BROADCAST=1")
     if not re.fullmatch(r"[0-9a-f]{40}", SOURCE_REVISION):
         raise SystemExit("SENTINELX_V21_SOURCE_REVISION must be the pushed 40-character Git SHA")
-    for path, expected in ((GOVERNOR_SOURCE, "8bd7dd0d5bedfb671e478f6cfc0a03aaf99328f5c4d93162c2784965035f7fcd"), (TARGET_SOURCE, PARENT_HASH), (SAFE_SOURCE, SAFE_HASH), (UNSAFE_SOURCE, UNSAFE_HASH)):
+    for path, expected in ((GOVERNOR_SOURCE, "3dbe0090d754e89a010cc8af239511c4a57e9626af555fa968076ea31098153e"), (TARGET_SOURCE, PARENT_HASH), (SAFE_SOURCE, SAFE_HASH), (UNSAFE_SOURCE, UNSAFE_HASH)):
         if source_sha256(path) != expected:
             raise SystemExit(f"V2.1 source hash mismatch: {path}")
     from scripts.v2_source_manifest import verify_manifest

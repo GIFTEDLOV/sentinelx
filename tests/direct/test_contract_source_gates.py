@@ -101,6 +101,13 @@ def test_v21_per_target_indexes_use_runtime_supported_scalar_storage():
     assert "DynArray[u256]()" not in text
 
 
+def test_v21_governor_normalizes_runtime_address_arguments():
+    text = (CONTRACT_DIR / "sentinelx_governor.py").read_text(encoding="utf-8")
+    assert "if isinstance(value, Address):" in text
+    assert "target_address = self._address_or_error(target, \"Target\")" in text
+    assert "Address(target)" not in text
+
+
 def test_v2_capture_can_fetch_but_review_path_has_no_web_fetch_call():
     module = parsed("sentinelx_governor.py")
     functions = {

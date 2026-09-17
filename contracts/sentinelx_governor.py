@@ -226,7 +226,11 @@ class SentinelXGovernor(gl.contract.Contract):
         if size < minimum or size > maximum:
             raise gl.vm.UserError(label + " length is invalid")
 
-    def _is_address_text(self, value: str) -> bool:
+    def _is_address_text(self, value: object) -> bool:
+        if isinstance(value, Address):
+            return True
+        if not isinstance(value, str):
+            return False
         if len(value) != 42 or not value.startswith("0x"):
             return False
         for char in value[2:]:
@@ -234,10 +238,12 @@ class SentinelXGovernor(gl.contract.Contract):
                 return False
         return True
 
-    def _address_or_error(self, value: str, label: str) -> Address:
+    def _address_or_error(self, value: object, label: str) -> Address:
+        if isinstance(value, Address):
+            return value
         if not self._is_address_text(value):
             raise gl.vm.UserError(label + " is not a valid address")
-        return Address(value)
+        return Address(typing.cast(str, value))
 
     def _is_sha256(self, value: str) -> bool:
         if len(value) != 64 or value != value.lower():
@@ -1447,7 +1453,7 @@ class SentinelXGovernor(gl.contract.Contract):
     def is_upgrade_authorized(self, proposal_id: u256, target: str, candidate_hash: str) -> bool:
         if not self._is_address_text(target) or not self._is_sha256(candidate_hash):
             return False
-        target_address = Address(target)
+        target_address = self._address_or_error(target, "Target")
         if proposal_id not in self.proposals:
             return False
         proposal = self.proposals[proposal_id]
@@ -1555,15 +1561,21 @@ class SentinelXGovernor(gl.contract.Contract):
 
     @gl.public.view
     def is_target_registered(self, target: str) -> bool:
-        if not self._is_address_text(target) or Address(target) not in self.policies:
+        if not self._is_address_text(target):
             return False
-        return bool(self.policies[Address(target)].active)
+        target_address = self._address_or_error(target, "Target")
+        if target_address not in self.policies:
+            return False
+        return bool(self.policies[target_address].active)
 
     @gl.public.view
     def get_target_policy(self, target: str) -> str:
-        if not self._is_address_text(target) or Address(target) not in self.policies:
+        if not self._is_address_text(target):
             return json.dumps({"status": "UNKNOWN"}, separators=(",", ":"))
-        policy = self.policies[Address(target)]
+        target_address = self._address_or_error(target, "Target")
+        if target_address not in self.policies:
+            return json.dumps({"status": "UNKNOWN"}, separators=(",", ":"))
+        policy = self.policies[target_address]
         return json.dumps(
             {
                 "target": str(policy.target),
@@ -1605,25 +1617,28 @@ class SentinelXGovernor(gl.contract.Contract):
     def get_target_proposals(self, target: str) -> list:
         if not self._is_address_text(target):
             return []
-        return self._target_id_list(self.proposals_by_target, Address(target))
+        return self._target_id_list(self.proposals_by_target, self._address_or_error(target, "Target"))
 
     @gl.public.view
     def get_active_proposal(self, target: str) -> u256:
         if not self._is_address_text(target):
             return self._empty_proposal()
-        return self.active_proposal_by_target.get(Address(target), self._empty_proposal())
+        return self.active_proposal_by_target.get(self._address_or_error(target, "Target"), self._empty_proposal())
 
     @gl.public.view
     def get_release_history(self, target: str) -> list:
         if not self._is_address_text(target):
             return []
-        return self._target_id_list(self.release_history_by_target, Address(target))
+        return self._target_id_list(self.release_history_by_target, self._address_or_error(target, "Target"))
 
     @gl.public.view
     def get_policy_fingerprint(self, target: str) -> str:
-        if not self._is_address_text(target) or Address(target) not in self.policies:
+        if not self._is_address_text(target):
             return ""
-        return self.policies[Address(target)].policy_fingerprint
+        target_address = self._address_or_error(target, "Target")
+        if target_address not in self.policies:
+            return ""
+        return self.policies[target_address].policy_fingerprint
 
     @gl.public.view
     def get_evidence_snapshot(self, proposal_id: u256) -> str:
