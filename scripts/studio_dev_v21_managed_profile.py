@@ -24,8 +24,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# Keep the corrected profile journal separate from the poisoned V2 profile.
-os.environ.setdefault("SENTINELX_PROFILE_STATE", "v2.1-profile")
+# Keep this corrected profile journal separate from both the poisoned V2
+# profile and the first V2.1 attempt that failed during registration.
+os.environ.setdefault("SENTINELX_PROFILE_STATE", "v2.1-profile-r2")
 
 from scripts.studio_dev_managed_bridge import (
     CHAIN_ID,
@@ -348,7 +349,7 @@ def _write_outputs(run: dict[str, Any], journal_obj: Any, preflight: dict[str, A
         "network": {"name": NETWORK, "rpc": RPC, "chain_id": CHAIN_ID, "profile_only": True},
         "toolchain": run.get("toolchain", {}),
         "gates": {
-            "direct_tests": {"count": 119, "result": "PASS"},
+            "direct_tests": {"count": 122, "result": "PASS"},
             "mutation_tests": {"count": 35, "killed": 35, "result": "PASS", "surviving": []},
             "static_lint": "PASS",
             "semantic_validation": "PASS",
