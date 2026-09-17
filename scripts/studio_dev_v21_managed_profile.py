@@ -720,11 +720,20 @@ def main() -> int:
     run["safe_proposal"] = read_json(client, governor, "get_proposal", [safe_proposal_id])
     _save_run(run)
 
+    capture_operation = "v2.profile.safe_capture_evidence"
+    capture_record = journal_obj.load()["operations"].get(capture_operation)
+    if isinstance(capture_record, dict) and capture_record.get("state") == "FINALIZED_EXECUTION_FAILED":
+        retry_operation = capture_operation + ".retry"
+        retry_record = journal_obj.load()["operations"].get(retry_operation)
+        if retry_record is not None and retry_record.get("state") != "FINALIZED_EXECUTED":
+            raise SystemExit("safe capture retry operation remains unresolved")
+        capture_operation = retry_operation
     capture = _submit_and_track(
-        client=client, journal_obj=journal_obj, operation="v2.profile.safe_capture_evidence",
+        client=client, journal_obj=journal_obj, operation=capture_operation,
         kind="method", method="capture_evidence", address=governor, args=[safe_proposal_id],
     )
-    _tag(journal_obj, "v2.profile.safe_capture_evidence", method="capture_evidence")
+    _tag(journal_obj, capture_operation, method="capture_evidence")
+    run["safe_capture_operation"] = capture_operation
     run["safe_capture_tx"] = capture["tx_hash"]
     snapshot = read_json(client, governor, "get_evidence_snapshot", [safe_proposal_id])
     if snapshot.get("status") != "EVIDENCE_READY" or snapshot.get("security_present") is not False:
