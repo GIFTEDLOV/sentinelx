@@ -517,7 +517,14 @@ def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]
             return _capture_cli_estimate(
                 client=client, address=address, args=args, estimate=estimate,
             )
-        if method == "execute_reviewed_upgrade" and not estimate.get("messageAllocations") and not estimate.get("message_allocations"):
+        if method == "execute_reviewed_upgrade":
+            existing_allocations = estimate.get("messageAllocations") or estimate.get("message_allocations")
+            # Studio may discover the direct install message while omitting
+            # the confirmation grandchild. Only a complete two-node tree is
+            # safe to submit; replace partial discovery with the measured
+            # install -> confirmation allocation tree below.
+            if isinstance(existing_allocations, list) and len(existing_allocations) >= 2:
+                return estimate
             if len(args) != 1:
                 raise RuntimeError("execute_reviewed_upgrade fee quote requires exactly one proposal ID")
             allocations = _measured_review_message_allocations(
