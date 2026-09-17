@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from types import SimpleNamespace
 from typing import Any
 
@@ -660,15 +661,24 @@ def finalize_if_needed(*, client: Any, journal_obj: Any, operation: str, tx_hash
 def read(client: Any, address: str, method: str, args: list[Any] | None = None) -> Any:
     from genlayer_py.types.transactions import TransactionHashVariant
 
-    return _safe(
-        client.read_contract(
-            client.w3.to_checksum_address(address), method, args=args or [],
-            # Studio's gen_call requires a sender address for read context;
-            # no signing capability or secret is attached to this object.
-            account=SimpleNamespace(address=EXPECTED_DEPLOYER),
-            transaction_hash_variant=TransactionHashVariant.LATEST_FINAL,
-        )
-    )
+    for attempt in range(8):
+        try:
+            return _safe(
+                client.read_contract(
+                    client.w3.to_checksum_address(address), method, args=args or [],
+                    # Studio's gen_call requires a sender address for read context;
+                    # no signing capability or secret is attached to this object.
+                    account=SimpleNamespace(address=EXPECTED_DEPLOYER),
+                    transaction_hash_variant=TransactionHashVariant.LATEST_FINAL,
+                )
+            )
+        except Exception as error:
+            # Studio-dev can temporarily reject all gen_call execution slots
+            # while consensus workers drain. Reads are safe to retry; writes
+            # deliberately remain single-broadcast in submit().
+            if "Server busy: all" not in str(error) or attempt == 7:
+                raise
+            time.sleep(5)
 
 
 def read_json(client: Any, address: str, method: str, args: list[Any] | None = None) -> dict[str, Any]:
