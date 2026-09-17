@@ -418,6 +418,52 @@ def _capture_cli_estimate(
     }
 
 
+def _measured_review_message_allocation(
+    *, client: Any, governor: str, proposal_id: int,
+) -> dict[str, Any] | None:
+    """Build the conditional install allocation from a live child observation.
+
+    Studio's direct review estimator can omit the allocation even though the
+    finalized review emits ``install_reviewed_upgrade``.  Reuse only the
+    current profile's successful ``register_target`` allocation, which is the
+    same one-message internal consensus path under the same fee policy, and
+    bind its recipient/call key to the frozen install call.  A profile with no
+    such measured observation fails closed rather than inventing fee data.
+    """
+    operations = journal().load()["operations"]
+    measured: dict[str, Any] | None = None
+    for record in operations.values():
+        if not isinstance(record, dict):
+            continue
+        if record.get("state") != "FINALIZED_EXECUTED":
+            continue
+        if record.get("method") != "register_with_sentinelx":
+            continue
+        estimate = record.get("estimate")
+        allocations = estimate.get("messageAllocations") if isinstance(estimate, dict) else None
+        if allocations is None and isinstance(estimate, dict):
+            allocations = estimate.get("message_allocations")
+        if isinstance(allocations, list) and len(allocations) == 1 and isinstance(allocations[0], dict):
+            measured = dict(allocations[0])
+            break
+    if measured is None:
+        return None
+
+    proposal = read_json(client, governor, "get_proposal", [proposal_id])
+    target = proposal.get("target")
+    if not isinstance(target, str) or not target:
+        raise RuntimeError("review proposal target is missing while building child allocation")
+    from genlayer_py.transactions.fees import derive_internal_message_call_key
+
+    measured["messageType"] = "internal"
+    measured["onAcceptance"] = False
+    measured["recipient"] = target
+    measured["callKey"] = derive_internal_message_call_key("install_reviewed_upgrade")
+    if not measured.get("budget") or not measured.get("feeParams"):
+        raise RuntimeError("measured internal child allocation is incomplete")
+    return measured
+
+
 def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]:
     # This is read-only and uses only the public signer address to build the
     # Studio simulation context.  The CLI owns all signing/broadcasting.
@@ -435,6 +481,28 @@ def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]
             return _capture_cli_estimate(
                 client=client, address=address, args=args, estimate=estimate,
             )
+        if method == "review_proposal" and not estimate.get("messageAllocations") and not estimate.get("message_allocations"):
+            if len(args) != 1:
+                raise RuntimeError("review_proposal fee quote requires exactly one proposal ID")
+            allocation = _measured_review_message_allocation(
+                client=client, governor=address, proposal_id=int(args[0]),
+            )
+            if allocation is None:
+                raise RuntimeError("review_proposal emitted no measured internal child allocation")
+            requote_options = dict(estimate["distribution"])
+            # A zero returned by the direct estimator means "no discovered
+            # child"; remove it so the measured allocation becomes the
+            # authoritative total message fee in the re-quote.
+            requote_options.pop("totalMessageFees", None)
+            requote_options["messageAllocations"] = [allocation]
+            requoted = _safe(client.estimate_transaction_fees(requote_options))
+            if not isinstance(requoted, dict) or not requoted.get("messageAllocations"):
+                raise RuntimeError("review_proposal child allocation re-quote was incomplete")
+            return {
+                **estimate,
+                **requoted,
+                "estimation_path": "measured_finalized_internal_child_allocation",
+            }
         return estimate
     except Exception:
         # Use the installed CLI's exact-call simulation when Python's SDK
