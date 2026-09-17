@@ -484,7 +484,23 @@ def _is_successful(receipt: dict[str, Any]) -> bool:
 
 
 def inspect_lifecycle(client: Any, tx_hash: str) -> dict[str, Any]:
-    value = client.get_transaction_lifecycle(tx_hash)
+    for attempt in range(8):
+        try:
+            value = client.get_transaction_lifecycle(tx_hash)
+            break
+        except Exception as error:
+            # Lifecycle inspection is a read-only reconciliation step.  The
+            # Studio-dev RPC applies the same rolling limit to this endpoint
+            # as to gen_call, so wait and retry without ever rebroadcasting.
+            message = str(error)
+            retryable = (
+                "Server busy: all" in message
+                or "Rate limit exceeded" in message
+                or "Too many requests" in message
+            )
+            if not retryable or attempt == 7:
+                raise
+            time.sleep(10 if "Rate limit exceeded" in message or "Too many requests" in message else 5)
     return {
         "stored_status": _enum_text(value.get("stored_status_name")),
         "projected_status": _enum_text(value.get("projected_status_name")),
