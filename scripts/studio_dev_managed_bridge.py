@@ -292,7 +292,12 @@ def _cli_command(command: list[str]) -> list[str]:
         f"process.argv = [process.argv[0], 'genlayer', ...{argv_source}];"
         f"await import({json.dumps(module_url)});"
     )
-    return [node, "--input-type=module", "-e", script, *command[1:]]
+    # When the original argv vector was moved to the temporary file, the
+    # short bridge command contains only its private marker.  That marker is
+    # not a Node or GenLayer CLI option and must not be passed after `-e`;
+    # `argv_source` above already restores the original CLI argv in-process.
+    trailing_args = [] if args_file is not None else command[1:]
+    return [node, "--input-type=module", "-e", script, *trailing_args]
 
 
 def _cleanup_cli_argument_files() -> None:
