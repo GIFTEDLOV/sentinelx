@@ -427,17 +427,18 @@ def _retryable_studio_error(error: Exception) -> bool:
     )
 
 
-def _measured_review_message_allocation(
+def _measured_review_message_allocations(
     *, client: Any, governor: str, proposal_id: int,
-) -> dict[str, Any] | None:
-    """Build the conditional install allocation from a live child observation.
+) -> list[dict[str, Any]] | None:
+    """Build the review install/confirmation tree from a live observation.
 
     Studio's direct review estimator can omit the allocation even though the
     finalized review emits ``install_reviewed_upgrade``.  Reuse only the
     current profile's successful ``register_target`` allocation, which is the
-    same one-message internal consensus path under the same fee policy, and
-    bind its recipient/call key to the frozen install call.  A profile with no
-    such measured observation fails closed rather than inventing fee data.
+    same internal consensus path under the same fee policy, and bind two
+    measured nodes: review -> install and install -> confirmation. A profile
+    with no such measured observation fails closed rather than inventing fee
+    data.
     """
     operations = journal().load()["operations"]
     measured: dict[str, Any] | None = None
@@ -462,15 +463,31 @@ def _measured_review_message_allocation(
     target = proposal.get("target")
     if not isinstance(target, str) or not target:
         raise RuntimeError("review proposal target is missing while building child allocation")
-    from genlayer_py.transactions.fees import derive_internal_message_call_key
+    from genlayer_py.transactions.fees import (
+        MESSAGE_ALLOCATION_ROOT_PARENT_INDEX,
+        derive_internal_message_call_key,
+    )
 
-    measured["messageType"] = "internal"
-    measured["onAcceptance"] = False
-    measured["recipient"] = target
-    measured["callKey"] = derive_internal_message_call_key("install_reviewed_upgrade")
     if not measured.get("budget") or not measured.get("feeParams"):
         raise RuntimeError("measured internal child allocation is incomplete")
-    return measured
+    measured_budget = int(measured["budget"])
+    install = dict(measured)
+    install["messageType"] = "internal"
+    install["onAcceptance"] = False
+    install["recipient"] = target
+    install["parentIndex"] = MESSAGE_ALLOCATION_ROOT_PARENT_INDEX
+    install["callKey"] = derive_internal_message_call_key("install_reviewed_upgrade")
+    # The root node funds its own internal-message primary reserve plus the
+    # direct confirmation child emitted by install_reviewed_upgrade.
+    install["budget"] = measured_budget + measured_budget
+
+    confirm = dict(measured)
+    confirm["messageType"] = "internal"
+    confirm["onAcceptance"] = False
+    confirm["recipient"] = governor
+    confirm["parentIndex"] = 0
+    confirm["callKey"] = derive_internal_message_call_key("confirm_install")
+    return [install, confirm]
 
 
 def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]:
@@ -503,17 +520,23 @@ def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]
         if method == "review_proposal" and not estimate.get("messageAllocations") and not estimate.get("message_allocations"):
             if len(args) != 1:
                 raise RuntimeError("review_proposal fee quote requires exactly one proposal ID")
-            allocation = _measured_review_message_allocation(
+            allocations = _measured_review_message_allocations(
                 client=client, governor=address, proposal_id=int(args[0]),
             )
-            if allocation is None:
+            if not allocations:
                 raise RuntimeError("review_proposal emitted no measured internal child allocation")
             requote_options = dict(estimate["distribution"])
             # A zero returned by the direct estimator means "no discovered
             # child"; remove it so the measured allocation becomes the
             # authoritative total message fee in the re-quote.
             requote_options.pop("totalMessageFees", None)
-            requote_options["messageAllocations"] = [allocation]
+            root_parent_index = (1 << 256) - 1
+            requote_options["totalMessageFees"] = sum(
+                int(item["budget"])
+                for item in allocations
+                if int(item.get("parentIndex", root_parent_index)) == root_parent_index
+            )
+            requote_options["messageAllocations"] = allocations
             requoted = _safe(client.estimate_transaction_fees(requote_options))
             if not isinstance(requoted, dict) or not requoted.get("messageAllocations"):
                 raise RuntimeError("review_proposal child allocation re-quote was incomplete")
