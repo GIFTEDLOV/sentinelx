@@ -32,7 +32,7 @@ def build_manifest() -> dict[str, Any]:
     return {
         "schema": "sentinelx-v2.1-source-manifest-v1",
         "contract_version": "SentinelX V2.1",
-        "source_lineage": "SentinelX V2 failed disposable registration profile -> V2.1 corrected candidate -> V2.1 runtime-compatibility corrections (nested storage, address, and optional wire normalization)",
+        "source_lineage": "SentinelX V2 failed disposable registration profile -> V2.1 corrected candidate -> V2.1 runtime-compatibility corrections (nested storage, address, optional wire normalization, and v0.6 nondeterministic API)",
         "network": "studio-dev",
         "rpc": "https://studio-dev.genlayer.com/api",
         "chain_id": 61997,

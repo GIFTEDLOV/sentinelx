@@ -997,7 +997,7 @@ class SentinelXGovernor(gl.contract.Contract):
 
         result = typing.cast(
             dict[str, object],
-            gl.vm.run_nondet_unsafe(leader_fn, validator_fn),  # pyright: ignore[reportUnknownMemberType]
+            gl.vm.run_nondet(leader_fn, validator_fn),  # pyright: ignore[reportUnknownMemberType]
         )
         kind = result.get("result_kind")
         error_class = str(result.get("error_class", ""))
@@ -1085,7 +1085,7 @@ class SentinelXGovernor(gl.contract.Contract):
 
         result = typing.cast(
             dict[str, object],
-            gl.vm.run_nondet_unsafe(leader_fn, validator_fn),  # pyright: ignore[reportUnknownMemberType]
+            gl.vm.run_nondet(leader_fn, validator_fn),  # pyright: ignore[reportUnknownMemberType]
         )
         self.review_web_fetch_counts[proposal_id] = 0
         proposal.reviewed_at = now

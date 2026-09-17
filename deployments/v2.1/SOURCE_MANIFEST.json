@@ -3,9 +3,9 @@
   "contract_version": "SentinelX V2.1",
   "contracts": [
     {
-      "bytes": 78567,
+      "bytes": 78553,
       "path": "contracts/sentinelx_governor.py",
-      "sha256": "1781c126e3b64cff297eaf58d0fe7ce7cc5195850216b3e457e3f68f29c33ffc"
+      "sha256": "70d140aaefaf258cbbaef07a0c06c67a0cb833921c62defc6158847f78332e0e"
     },
     {
       "bytes": 7228,
@@ -26,7 +26,7 @@
   "network": "studio-dev",
   "rpc": "https://studio-dev.genlayer.com/api",
   "schema": "sentinelx-v2.1-source-manifest-v1",
-  "source_lineage": "SentinelX V2 failed disposable registration profile -> V2.1 corrected candidate -> V2.1 runtime-compatibility corrections (nested storage, address, and optional wire normalization)",
+  "source_lineage": "SentinelX V2 failed disposable registration profile -> V2.1 corrected candidate -> V2.1 runtime-compatibility corrections (nested storage, address, optional wire normalization, and v0.6 nondeterministic API)",
   "toolchain": {
     "genlayer_cli": "0.40.0-rc.3",
     "genlayer_js": "2.0.0-rc.1",

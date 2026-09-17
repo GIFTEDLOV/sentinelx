@@ -108,6 +108,12 @@ def test_v21_governor_normalizes_runtime_address_arguments():
     assert "Address(target)" not in text
 
 
+def test_v21_uses_supported_v06_nondeterministic_primitive():
+    text = (CONTRACT_DIR / "sentinelx_governor.py").read_text(encoding="utf-8")
+    assert text.count("gl.vm.run_nondet(leader_fn, validator_fn)") == 2
+    assert "run_nondet_unsafe" not in text
+
+
 def test_v2_capture_can_fetch_but_review_path_has_no_web_fetch_call():
     module = parsed("sentinelx_governor.py")
     functions = {
