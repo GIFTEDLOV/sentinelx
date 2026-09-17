@@ -185,14 +185,14 @@ def _verify_cli_source(address: str, source: Path) -> dict[str, object]:
 
 def _publish_ci_evidence(
     *, target: str, policy_fingerprint: str, candidate_hash: str,
-    candidate_source: Path, label: str,
+    candidate_source: Path, label: str, published_at: int | None = None,
 ) -> dict[str, object]:
     """Publish one immutable CI envelope and verify the HTTPS bytes before use."""
     from argparse import Namespace
     from scripts.build_evidence import make_envelope
 
     evidence_id = f"ci-v2-{label}-{time.time_ns()}"
-    published = _now()
+    published = _now() if published_at is None else int(published_at)
     envelope = make_envelope(
         Namespace(
             target=target,

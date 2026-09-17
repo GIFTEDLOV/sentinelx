@@ -69,6 +69,10 @@ FEE_PROFILE = ROOT / "artifacts" / "v2.2" / "fee-profile.v2.2.json"
 COVERAGE = ROOT / "artifacts" / "v2.2" / "fee-profile-coverage.v2.2.json"
 READINESS = ROOT / "deployments" / "v2.2" / "DEPLOYMENT_READINESS.json"
 COMPACT_CAPTURE_MAX_TEST_SIZE = 4_096
+# Studio-dev simulations can use a slightly older finalized block timestamp
+# than the wall clock that publishes the immutable CI artifact. Keep the
+# artifact fresh while leaving a bounded margin for that transport skew.
+CI_CLOCK_SKEW_SECONDS = 300
 DIRECT_TEST_COUNT = 142
 MUTATION_TEST_COUNT = 49
 TX_HASH_RE = re.compile(r"0x[0-9a-fA-F]{64}")
@@ -667,6 +671,7 @@ def main() -> int:
         candidate_hash=SAFE_HASH,
         candidate_source=SAFE_SOURCE,
         label="v22-safe",
+        published_at=max(0, int(time.time()) - CI_CLOCK_SKEW_SECONDS),
     )
     run["safe_ci"] = safe_ci
     _save_run(run)
@@ -823,6 +828,7 @@ def main() -> int:
         candidate_hash=UNSAFE_HASH,
         candidate_source=UNSAFE_SOURCE,
         label="v22-unsafe",
+        published_at=max(0, int(time.time()) - CI_CLOCK_SKEW_SECONDS),
     )
     unsafe_proposal_id, unsafe_proposal = _create_proposal(
         client=client,
