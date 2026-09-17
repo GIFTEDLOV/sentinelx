@@ -142,7 +142,6 @@ class EvidenceSnapshotRecord:
     candidate_source_url: str
     candidate_source_hash: str
     candidate_source_length: u64
-    candidate_source_bytes: bytes
     ci_evidence_url: str
     ci_evidence_id: str
     ci_evidence_hash: str
@@ -1121,7 +1120,7 @@ class SentinelXGovernor(gl.contract.Contract):
             return False
         if snapshot.parent_source_length != len(snapshot.parent_source_bytes):
             return False
-        if snapshot.candidate_source_length != len(snapshot.candidate_source_bytes):
+        if snapshot.candidate_source_length != len(proposal.candidate_code):
             return False
         if snapshot.ci_evidence_length != len(snapshot.ci_evidence_bytes):
             return False
@@ -1129,9 +1128,7 @@ class SentinelXGovernor(gl.contract.Contract):
             return False
         if _sha256_hex(snapshot.parent_source_bytes) != snapshot.parent_source_hash:
             return False
-        if _sha256_hex(snapshot.candidate_source_bytes) != snapshot.candidate_source_hash:
-            return False
-        if snapshot.candidate_source_bytes != proposal.candidate_code:
+        if _sha256_hex(proposal.candidate_code) != snapshot.candidate_source_hash:
             return False
         if _sha256_hex(snapshot.ci_evidence_bytes) != snapshot.ci_evidence_hash:
             return False
@@ -1219,7 +1216,7 @@ class SentinelXGovernor(gl.contract.Contract):
             policy,
             proposal,
             snapshot.parent_source_bytes.decode("utf-8"),
-            snapshot.candidate_source_bytes.decode("utf-8"),
+            proposal.candidate_code.decode("utf-8"),
             snapshot.ci_evidence_bytes.decode("utf-8"),
             security_source,
         )
@@ -1327,7 +1324,6 @@ class SentinelXGovernor(gl.contract.Contract):
             candidate_source_url=proposal.candidate_source_url,
             candidate_source_hash=typing.cast(str, result["candidate_sha256"]),
             candidate_source_length=typing.cast(int, result["candidate_length"]),
-            candidate_source_bytes=proposal.candidate_code,
             ci_evidence_url=proposal.ci_evidence_url,
             ci_evidence_id=proposal.ci_evidence_id,
             ci_evidence_hash=typing.cast(str, result["ci_sha256"]),
