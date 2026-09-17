@@ -349,7 +349,7 @@ def _write_outputs(run: dict[str, Any], journal_obj: Any, preflight: dict[str, A
         "network": {"name": NETWORK, "rpc": RPC, "chain_id": CHAIN_ID, "profile_only": True},
         "toolchain": run.get("toolchain", {}),
         "gates": {
-            "direct_tests": {"count": 126, "result": "PASS"},
+            "direct_tests": {"count": 128, "result": "PASS"},
             "mutation_tests": {"count": 35, "killed": 35, "result": "PASS", "surviving": []},
             "static_lint": "PASS",
             "semantic_validation": "PASS",
@@ -600,6 +600,10 @@ def main() -> int:
     run["recovery_target"] = recovery_target
     run["recovery_target_tx"] = recovery_deploy["tx_hash"]
     run["recovery_target_source_parity"] = _verify_cli_source(recovery_target, TARGET_SOURCE)
+    # Persist the fresh recovery target before the intentionally failing write.
+    # A CLI-side rejection must not make the target address disappear from the
+    # resumable profile record.
+    _save_run(run)
     recovery_args = [
         "ProtectedApp V1 registration recovery", constitution,
         "GIFTEDLOV/sentinelx", "GIFTEDLOV/sentinelx-ci", "OPTIONAL", "",
@@ -628,6 +632,19 @@ def main() -> int:
         malformed = list(recovery_args)
         malformed[11] = "not-a-sha256"
         recovery_failure_operation = "v2.1.profile.recovery_registration_malformed"
+        prior_failure = journal_obj.load()["operations"].get(recovery_failure_operation)
+        if isinstance(prior_failure, dict):
+            if (
+                prior_failure.get("state") == "BLOCKED_BEFORE_BROADCAST"
+                and prior_failure.get("broadcast_verified_absent") is True
+                and not prior_failure.get("tx_hash")
+            ):
+                # The first CLI attempt is retained as evidence.  A new
+                # operation name is mandatory for the verified no-broadcast
+                # retry; the original reservation is never overwritten.
+                recovery_failure_operation += ".retry"
+            elif prior_failure.get("state") != "FINALIZED_EXECUTED":
+                raise SystemExit("malformed recovery operation remains unresolved")
         recovery_failure_error = ""
         try:
             _submit_and_track(

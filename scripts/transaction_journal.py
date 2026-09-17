@@ -137,6 +137,45 @@ class TransactionJournal:
         self._save(document)
         return record.copy()
 
+    def mark_not_broadcast(
+        self,
+        operation: str,
+        *,
+        latest_nonce: int,
+        pending_nonce: int,
+        verification: str,
+    ) -> dict[str, Any]:
+        """Close a no-hash CLI attempt only after nonce convergence is proved.
+
+        A reserved operation without a transaction hash is normally terminally
+        ambiguous.  This narrower transition is allowed only when the caller
+        has independently checked that latest and pending nonce are equal and
+        the record still contains no hash.  The original attempt remains in
+        the journal and can never be silently reused or overwritten.
+        """
+        if not verification:
+            raise JournalError("broadcast-absence verification is required")
+        if int(latest_nonce) != int(pending_nonce):
+            raise JournalError("nonce convergence is required to close a no-hash attempt")
+        document = self.load()
+        record = document["operations"].get(operation)
+        if not isinstance(record, dict):
+            raise JournalError(f"operation {operation!r} is not journaled")
+        if record.get("tx_hash"):
+            raise JournalError("a submitted operation cannot be marked not broadcast")
+        if record.get("state") not in ("BROADCAST_RESERVED", "BROADCAST_CALL_RAISED"):
+            raise JournalError("operation is not an unsubmitted CLI attempt")
+        record.update({
+            "state": "BLOCKED_BEFORE_BROADCAST",
+            "broadcast_verified_absent": True,
+            "broadcast_absence_verification": verification,
+            "latest_nonce_at_verification": int(latest_nonce),
+            "pending_nonce_at_verification": int(pending_nonce),
+        })
+        record["updated_at"] = _utc_now()
+        self._save(document)
+        return record.copy()
+
     def record_child(
         self,
         parent_operation: str,

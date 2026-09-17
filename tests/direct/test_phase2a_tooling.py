@@ -93,6 +93,33 @@ def test_journal_reservation_blocks_duplicate_and_persists_hash_before_polling(t
         journal.record_submission("other", "0x" + "a" * 64)
 
 
+def test_journal_closes_only_verified_no_hash_attempt_and_preserves_retry_barrier(tmp_path: Path):
+    journal = TransactionJournal(tmp_path / "journal.json")
+    journal.reserve_broadcast("malformed-attempt")
+    journal.update("malformed-attempt", state="BROADCAST_CALL_RAISED", cli_exit_code=1)
+    record = journal.mark_not_broadcast(
+        "malformed-attempt", latest_nonce=17, pending_nonce=17,
+        verification="RPC latest/pending nonce converged after CLI returned no hash",
+    )
+    assert record["state"] == "BLOCKED_BEFORE_BROADCAST"
+    assert record["broadcast_verified_absent"] is True
+    assert journal.load()["operations"]["malformed-attempt"].get("tx_hash") is None
+    with pytest.raises(JournalError, match="already reserved"):
+        journal.reserve_broadcast("malformed-attempt")
+    journal.reserve_broadcast("malformed-attempt.retry")
+
+
+def test_journal_refuses_no_hash_close_without_nonce_convergence(tmp_path: Path):
+    journal = TransactionJournal(tmp_path / "journal.json")
+    journal.reserve_broadcast("ambiguous-attempt")
+    journal.update("ambiguous-attempt", state="BROADCAST_CALL_RAISED")
+    with pytest.raises(JournalError, match="nonce convergence"):
+        journal.mark_not_broadcast(
+            "ambiguous-attempt", latest_nonce=17, pending_nonce=18,
+            verification="insufficient",
+        )
+
+
 def test_corrupt_journal_fails_closed(tmp_path: Path):
     path = tmp_path / "journal.json"
     path.write_text("not-json", encoding="utf-8")

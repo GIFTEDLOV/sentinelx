@@ -97,7 +97,10 @@ def account_preflight(client: Any, address: str, journal_obj: Any) -> dict[str, 
     operations = journal_obj.load()["operations"]
     unresolved = [
         str(name) for name, record in operations.items()
-        if isinstance(record, dict) and record.get("state") not in ("FINALIZED_EXECUTED", "FINALIZED_EXECUTION_FAILED", "CLI_COMMAND_FAILED")
+        if isinstance(record, dict) and record.get("state") not in (
+            "FINALIZED_EXECUTED", "FINALIZED_EXECUTION_FAILED",
+            "CLI_COMMAND_FAILED", "BLOCKED_BEFORE_BROADCAST",
+        )
     ]
     return {
         "network": NETWORK,
