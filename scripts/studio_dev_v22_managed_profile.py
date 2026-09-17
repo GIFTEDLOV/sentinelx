@@ -118,7 +118,7 @@ def _read_run() -> dict[str, Any]:
 def _save_run(value: dict[str, Any]) -> None:
     LOCAL_STATE.mkdir(parents=True, exist_ok=True)
     RUN_PATH.write_text(
-        json.dumps(value, indent=2, sort_keys=True) + "\n",
+        json.dumps(_json_safe(value), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
         newline="\n",
     )
