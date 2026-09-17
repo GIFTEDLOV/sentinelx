@@ -518,6 +518,24 @@ def test_review_performs_zero_web_fetches():
     assert model.get_review_web_fetch_count(proposal.proposal_id) == 0
 
 
+def test_review_and_install_execution_are_separate_boundaries():
+    model, proposal = prepared()
+    with pytest.raises(SentinelXError, match="authorization"):
+        model.execute_reviewed_upgrade(proposal.proposal_id, caller=OWNER)
+    model.capture_evidence(proposal.proposal_id, web=web_for(proposal), caller=OWNER)
+    assert model.review(proposal.proposal_id, semantic=all_true(), caller=OWNER) == QUEUED
+    model.execute_reviewed_upgrade(proposal.proposal_id, caller=OWNER)
+    assert model.authorized(proposal.proposal_id)
+
+
+def test_separate_install_execution_preserves_zero_fetch_review():
+    model, proposal = prepared()
+    model.capture_evidence(proposal.proposal_id, web=web_for(proposal), caller=OWNER)
+    model.review(proposal.proposal_id, semantic=all_true(), caller=OWNER)
+    model.execute_reviewed_upgrade(proposal.proposal_id, caller=OWNER)
+    assert model.get_review_web_fetch_count(proposal.proposal_id) == 0
+
+
 def test_repair_cannot_change_parent_candidate_or_policy():
     model, proposal = prepared()
     original = (proposal.parent_code_hash, proposal.candidate_code,

@@ -617,6 +617,14 @@ class SentinelXV2Model:
         proposal.execution_deadline = self.now + policy.execution_timeout
         return proposal.status
 
+    def execute_reviewed_upgrade(self, proposal_id: int, *, caller: str) -> None:
+        proposal = self.proposals[proposal_id]
+        policy = self.policies[proposal.target]
+        if caller != policy.owner:
+            raise SentinelXError("Only the registered target owner may execute this action")
+        if not self.authorized(proposal_id):
+            raise SentinelXError("Install authorization is absent")
+
     def review_consensus(self, proposal_id: int, *, leader: dict[str, bool],
                          validator: dict[str, bool], caller: str) -> str:
         if leader != validator:

@@ -155,6 +155,21 @@ def test_v22_stages_bytes_and_only_returns_compact_capture_facts():
     assert "Evidence must be staged before capture" in capture
 
 
+def test_v22_review_queues_before_deterministic_install_execution():
+    module = parsed("sentinelx_governor.py")
+    functions = {
+        node.name: node for node in ast.walk(module)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    review = ast.unparse(functions["_review_proposal"])
+    execute = ast.unparse(functions["execute_reviewed_upgrade"])
+    assert "install_reviewed_upgrade" not in review
+    assert "proposal.status = STATUS_UPGRADE_QUEUED" in review
+    assert "proposal.status != STATUS_UPGRADE_QUEUED" in execute
+    assert "install_reviewed_upgrade" in execute
+    assert "emit(on='finalized')" in execute
+
+
 def test_v2_target_registration_interfaces_include_attestation_mode():
     for name in ("protected_app_v1.py", "protected_app_v2_safe.py"):
         text = (CONTRACT_DIR / name).read_text(encoding="utf-8")

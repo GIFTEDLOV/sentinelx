@@ -32,6 +32,7 @@ REQUESTED_METHODS = (
     "register_target",
     "create_proposal",
     "review_proposal",
+    "execute_reviewed_upgrade",
     "repair_evidence",
     "retry_review",
     "cancel_proposal",

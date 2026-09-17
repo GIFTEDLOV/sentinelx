@@ -62,7 +62,7 @@ CI_PREFIX = "https://raw.githubusercontent.com/GIFTEDLOV/sentinelx-ci/"
 SAFE_HASH = "72c240f0725dc314429d01f051d4b40dc906623f48ba2b38514824d7f46011e5"
 UNSAFE_HASH = "6b3f7a0ebae0f097036f33b57b77b1d10ae2d813b7330e34ba1dab33a5010653"
 PARENT_HASH = "470c9a72c63f8ca345956299edc530bc92924eaa1708c05a767b141df05d1c4f"
-GOVERNOR_HASH = "2098adf7c27cf8501e875e22fbd88941883610739611d20e2848753aace4be87"
+GOVERNOR_HASH = "a93c6a5d77f49b75ef5d34d74c1a40bef2c7fab48c37c2e49756d1dc141eb6e8"
 LOCAL_STATE = JOURNAL_PATH.parent
 RUN_PATH = LOCAL_STATE / "run.json"
 FEE_PROFILE = ROOT / "artifacts" / "v2.2" / "fee-profile.v2.2.json"
@@ -73,8 +73,8 @@ COMPACT_CAPTURE_MAX_TEST_SIZE = 4_096
 # than the wall clock that publishes the immutable CI artifact. Keep the
 # artifact fresh while leaving a bounded margin for that transport skew.
 CI_CLOCK_SKEW_SECONDS = 300
-DIRECT_TEST_COUNT = 142
-MUTATION_TEST_COUNT = 49
+DIRECT_TEST_COUNT = 145
+MUTATION_TEST_COUNT = 50
 TX_HASH_RE = re.compile(r"0x[0-9a-fA-F]{64}")
 
 REQUESTED_METHODS = (
@@ -84,6 +84,7 @@ REQUESTED_METHODS = (
     "stage_evidence",
     "capture_evidence",
     "review_proposal",
+    "execute_reviewed_upgrade",
     "repair_evidence",
     "retry_review",
     "cancel_proposal",
@@ -772,11 +773,24 @@ def main() -> int:
         method="review_proposal",
         address=governor,
         args=[safe_proposal_id],
-        child_methods=["install_reviewed_upgrade"],
     )
     _tag(journal_obj, "v2.2.profile.safe_review_proposal", method="review_proposal")
-    if review.get("children"):
-        _tag(journal_obj, "v2.2.profile.safe_review_proposal.child.0.child.0", method="confirm_install")
+    reviewed_state = read_json(client, governor, "get_proposal", [safe_proposal_id])
+    if reviewed_state.get("status") != "UPGRADE_QUEUED":
+        raise SystemExit(f"safe semantic review did not queue exact approved authorization: {reviewed_state}")
+    execute = _submit_and_track(
+        client=client,
+        journal_obj=journal_obj,
+        operation="v2.2.profile.safe_execute_reviewed_upgrade",
+        kind="method",
+        method="execute_reviewed_upgrade",
+        address=governor,
+        args=[safe_proposal_id],
+        child_methods=["install_reviewed_upgrade"],
+    )
+    _tag(journal_obj, "v2.2.profile.safe_execute_reviewed_upgrade", method="execute_reviewed_upgrade")
+    if execute.get("children"):
+        _tag(journal_obj, "v2.2.profile.safe_execute_reviewed_upgrade.child.0.child.0", method="confirm_install")
     safe_state = read_json(client, governor, "get_proposal", [safe_proposal_id])
     vector = safe_state.get("semantic_vector")
     if safe_state.get("status") != "VERIFIED" or not isinstance(vector, dict) or len(vector) != 14 or not all(value is True for value in vector.values()):
@@ -792,8 +806,10 @@ def main() -> int:
     }
     run.update({
         "safe_review_tx": review["tx_hash"],
-        "safe_review_child_txs": review.get("all_children", []),
         "safe_review_result": "FINALIZED_FINISHED_WITH_RETURN",
+        "safe_execute_tx": execute["tx_hash"],
+        "safe_execute_result": "FINALIZED_FINISHED_WITH_RETURN",
+        "safe_review_child_txs": execute.get("all_children", []),
         "safe_final_state": safe_state,
         "review_time_web_fetches": read(client, governor, "get_review_web_fetch_count", [safe_proposal_id]),
         "final_target_state": target_after,

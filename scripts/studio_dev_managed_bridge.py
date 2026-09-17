@@ -37,7 +37,7 @@ ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 # to a generic zero-message quote when concrete estimation fails.
 MESSAGE_PRODUCING_METHODS = frozenset({
     "register_with_sentinelx",
-    "review_proposal",
+    "execute_reviewed_upgrade",
     "install_reviewed_upgrade",
     "confirm_install",
 })
@@ -430,15 +430,13 @@ def _retryable_studio_error(error: Exception) -> bool:
 def _measured_review_message_allocations(
     *, client: Any, governor: str, proposal_id: int,
 ) -> list[dict[str, Any]] | None:
-    """Build the review install/confirmation tree from a live observation.
+    """Build the deterministic install/confirmation tree from a live observation.
 
-    Studio's direct review estimator can omit the allocation even though the
-    finalized review emits ``install_reviewed_upgrade``.  Reuse only the
-    current profile's successful ``register_target`` allocation, which is the
-    same internal consensus path under the same fee policy, and bind two
-    measured nodes: review -> install and install -> confirmation. A profile
-    with no such measured observation fails closed rather than inventing fee
-    data.
+    Reuse only the current profile's successful ``register_target``
+    allocation, which is the same internal consensus path under the same fee
+    policy, and bind two measured nodes: execution -> install and install ->
+    confirmation. A profile with no such measured observation fails closed
+    rather than inventing fee data.
     """
     operations = journal().load()["operations"]
     measured: dict[str, Any] | None = None
@@ -519,14 +517,14 @@ def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]
             return _capture_cli_estimate(
                 client=client, address=address, args=args, estimate=estimate,
             )
-        if method == "review_proposal" and not estimate.get("messageAllocations") and not estimate.get("message_allocations"):
+        if method == "execute_reviewed_upgrade" and not estimate.get("messageAllocations") and not estimate.get("message_allocations"):
             if len(args) != 1:
-                raise RuntimeError("review_proposal fee quote requires exactly one proposal ID")
+                raise RuntimeError("execute_reviewed_upgrade fee quote requires exactly one proposal ID")
             allocations = _measured_review_message_allocations(
                 client=client, governor=address, proposal_id=int(args[0]),
             )
             if not allocations:
-                raise RuntimeError("review_proposal emitted no measured internal child allocation")
+                raise RuntimeError("execute_reviewed_upgrade emitted no measured internal child allocation")
             requote_options = dict(estimate["distribution"])
             # A zero returned by the direct estimator means "no discovered
             # child"; remove it so the measured allocation becomes the
@@ -541,7 +539,7 @@ def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]
             requote_options["messageAllocations"] = allocations
             requoted = _safe(client.estimate_transaction_fees(requote_options))
             if not isinstance(requoted, dict) or not requoted.get("messageAllocations"):
-                raise RuntimeError("review_proposal child allocation re-quote was incomplete")
+                raise RuntimeError("execute_reviewed_upgrade child allocation re-quote was incomplete")
             return {
                 **estimate,
                 **requoted,

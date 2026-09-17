@@ -35,9 +35,10 @@ COMMIT_B = "b" * 40
 
 def test_message_producing_methods_never_use_generic_zero_message_fallback():
     assert {
-        "register_with_sentinelx", "review_proposal",
+        "register_with_sentinelx", "execute_reviewed_upgrade",
         "install_reviewed_upgrade", "confirm_install",
     } <= MESSAGE_PRODUCING_METHODS
+    assert "review_proposal" not in MESSAGE_PRODUCING_METHODS
     assert "capture_evidence" not in MESSAGE_PRODUCING_METHODS
 
 

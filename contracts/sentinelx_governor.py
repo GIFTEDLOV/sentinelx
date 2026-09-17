@@ -1489,9 +1489,6 @@ class SentinelXGovernor(gl.contract.Contract):
 
         proposal.status = STATUS_UPGRADE_QUEUED
         proposal.execution_deadline = now + int(policy.execution_timeout_seconds)
-        SentinelXTargetInterface(proposal.target).emit(on="finalized").install_reviewed_upgrade(
-            proposal_id, proposal.candidate_code_hash
-        )
 
     # ------------------------------------------------------------------
     # Immutable target registration
@@ -1850,6 +1847,32 @@ class SentinelXGovernor(gl.contract.Contract):
             raise gl.vm.UserError("Proposal is not reviewable; capture evidence first")
         policy = self._require_policy(proposal.target)
         self._review_proposal(proposal_id, proposal, policy)
+
+    @gl.public.write
+    def execute_reviewed_upgrade(self, proposal_id: u256) -> None:
+        """Emit installation only after a finalized semantic approval.
+
+        Keeping this deterministic boundary separate from ``review_proposal``
+        prevents the nondeterministic review receipt from carrying the nested
+        install/confirmation message tree.  The target and governor still
+        enforce the same finality-gated authorization before the upgrade is
+        verified.
+        """
+        proposal = self._require_proposal(proposal_id)
+        policy = self._require_owner(proposal.target)
+        if proposal.status != STATUS_UPGRADE_QUEUED:
+            raise gl.vm.UserError("Proposal is not authorized for execution")
+        if policy.policy_fingerprint != proposal.policy_fingerprint:
+            raise gl.vm.UserError("Proposal policy fingerprint no longer matches")
+        if policy.current_code_hash != proposal.parent_code_hash:
+            raise gl.vm.UserError("Proposal parent is no longer current")
+        if self._now() > int(proposal.execution_deadline):
+            raise gl.vm.UserError("Upgrade authorization has expired")
+        if self.active_proposal_by_target.get(proposal.target, self._empty_proposal()) != proposal_id:
+            raise gl.vm.UserError("Proposal is not the active target authorization")
+        SentinelXTargetInterface(proposal.target).emit(on="finalized").install_reviewed_upgrade(
+            proposal_id, proposal.candidate_code_hash
+        )
 
     @gl.public.view
     def is_upgrade_authorized(self, proposal_id: u256, target: str, candidate_hash: str) -> bool:

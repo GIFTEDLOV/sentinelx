@@ -33,7 +33,7 @@ TARGET = ROOT / "contracts" / "protected_app_v1.py"
 ORACLE = ROOT / "direct" / "sentinelx_v2_model.py"
 ORACLE_BASE = ROOT / "direct" / "sentinelx_model.py"
 FROZEN_HASHES = {
-    GOVERNOR: "2098adf7c27cf8501e875e22fbd88941883610739611d20e2848753aace4be87",
+    GOVERNOR: "a93c6a5d77f49b75ef5d34d74c1a40bef2c7fab48c37c2e49756d1dc141eb6e8",
     ROOT / "contracts" / "protected_app_v1.py": "470c9a72c63f8ca345956299edc530bc92924eaa1708c05a767b141df05d1c4f",
     ROOT / "contracts" / "protected_app_v2_safe.py": "72c240f0725dc314429d01f051d4b40dc906623f48ba2b38514824d7f46011e5",
     ROOT / "contracts" / "protected_app_v2_unsafe.py": "6b3f7a0ebae0f097036f33b57b77b1d10ae2d813b7330e34ba1dab33a5010653",
@@ -935,6 +935,25 @@ def gate_unattested_review(functions: dict[str, str]) -> None:
     assert "evidence_set_hash not in self.evidence_snapshots" in functions["_review_proposal"]
 
 
+def gate_separate_install_execution(functions: dict[str, str]) -> None:
+    review = functions["_review_proposal"]
+    execute = functions["execute_reviewed_upgrade"]
+    assert "install_reviewed_upgrade" not in review
+    assert "proposal.status = STATUS_UPGRADE_QUEUED" in review
+    assert "proposal.status != STATUS_UPGRADE_QUEUED" in execute
+    assert 'emit(on="finalized").install_reviewed_upgrade' in execute
+
+
+def probe_execute_before_review(module: ModuleType) -> None:
+    model, proposal = _capture(module)
+    _expect_error(
+        lambda: model.execute_reviewed_upgrade(
+            proposal.proposal_id, caller=OWNER_ADDRESS
+        ),
+        "execute before review",
+    )
+
+
 def _mutations() -> tuple[Mutation, ...]:
     governor = GOVERNOR
     target = TARGET
@@ -1191,6 +1210,16 @@ def _mutations() -> tuple[Mutation, ...]:
             _source('            "security_sha256": sha256_hex(security_raw) if security_present else "",\n',
                     '            "security_bytes_hex": security_raw.hex(),\n            "security_sha256": sha256_hex(security_raw) if security_present else "",\n', "compact security output oracle"),
             lambda m: probe_compact_output(m, "security_bytes_hex"), gate_compact_output),
+        Mutation(50, "execute upgrade without finalized semantic authorization", governor, _source_in_function(
+            "execute_reviewed_upgrade",
+            '        if proposal.status != STATUS_UPGRADE_QUEUED:\n            raise gl.vm.UserError("Proposal is not authorized for execution")\n',
+            '        if False:\n            raise gl.vm.UserError("Proposal is not authorized for execution")\n',
+            "separate install execution gate"), _source_in_function(
+            "execute_reviewed_upgrade",
+            '        if not self.authorized(proposal_id):\n            raise SentinelXError("Install authorization is absent")\n',
+            '        if False:\n            raise SentinelXError("Install authorization is absent")\n',
+            "separate install execution oracle"), probe_execute_before_review,
+            gate_separate_install_execution),
     )
 
 
