@@ -2,7 +2,7 @@
   "baseline_target_sha256": "470c9a72c63f8ca345956299edc530bc92924eaa1708c05a767b141df05d1c4f",
   "byte_counts": {
     "baseline_target": 7228,
-    "governor": 94798,
+    "governor": 96632,
     "safe_candidate": 7008,
     "unsafe_candidate": 3753
   },
@@ -10,9 +10,9 @@
   "contract_version": "SentinelX V2.2",
   "contracts": [
     {
-      "bytes": 94798,
+      "bytes": 96632,
       "path": "contracts/sentinelx_governor.py",
-      "sha256": "fc726bd302b2494282a3db001f1ced3222514ec68056dd107525533233388fda"
+      "sha256": "e7f5206af00041c3f88061b8523461c185a6c289240ec79bca684f538aa18418"
     },
     {
       "bytes": 7228,
@@ -30,7 +30,7 @@
       "sha256": "6b3f7a0ebae0f097036f33b57b77b1d10ae2d813b7330e34ba1dab33a5010653"
     }
   ],
-  "governor_sha256": "fc726bd302b2494282a3db001f1ced3222514ec68056dd107525533233388fda",
+  "governor_sha256": "e7f5206af00041c3f88061b8523461c185a6c289240ec79bca684f538aa18418",
   "network": "studio-dev",
   "rpc": "https://studio-dev.genlayer.com/api",
   "safe_candidate_sha256": "72c240f0725dc314429d01f051d4b40dc906623f48ba2b38514824d7f46011e5",

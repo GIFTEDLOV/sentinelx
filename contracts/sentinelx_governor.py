@@ -1365,7 +1365,37 @@ class SentinelXGovernor(gl.contract.Contract):
 
         proposal_memory = gl.storage.copy_to_memory(proposal)
         policy_memory = gl.storage.copy_to_memory(policy)
-        snapshot_memory = gl.storage.copy_to_memory(snapshot)
+        # Copy the stored byte fields into a fresh in-memory record.  Studio's
+        # composite dataclass copy can change the representation of nested
+        # storage fields; copying the exact bytes before nondeterministic
+        # semantic evaluation keeps the authenticated snapshot intact.
+        snapshot_memory = EvidenceSnapshotRecord(
+            schema=snapshot.schema,
+            proposal_id=snapshot.proposal_id,
+            target=snapshot.target,
+            evidence_identity=snapshot.evidence_identity,
+            parent_source_url=snapshot.parent_source_url,
+            parent_source_hash=snapshot.parent_source_hash,
+            parent_source_length=snapshot.parent_source_length,
+            parent_source_bytes=gl.storage.copy_to_memory(snapshot.parent_source_bytes),
+            candidate_source_url=snapshot.candidate_source_url,
+            candidate_source_hash=snapshot.candidate_source_hash,
+            candidate_source_length=snapshot.candidate_source_length,
+            ci_evidence_url=snapshot.ci_evidence_url,
+            ci_evidence_id=snapshot.ci_evidence_id,
+            ci_evidence_hash=snapshot.ci_evidence_hash,
+            ci_evidence_length=snapshot.ci_evidence_length,
+            ci_evidence_bytes=gl.storage.copy_to_memory(snapshot.ci_evidence_bytes),
+            security_evidence_url=snapshot.security_evidence_url,
+            security_evidence_id=snapshot.security_evidence_id,
+            security_evidence_hash=snapshot.security_evidence_hash,
+            security_evidence_length=snapshot.security_evidence_length,
+            security_evidence_bytes=gl.storage.copy_to_memory(snapshot.security_evidence_bytes),
+            security_present=snapshot.security_present,
+            policy_fingerprint=snapshot.policy_fingerprint,
+            captured_at=snapshot.captured_at,
+            snapshot_digest=snapshot.snapshot_digest,
+        )
 
         def leader_fn() -> dict[str, object]:
             return self._independent_snapshot_review(
