@@ -721,13 +721,21 @@ def main() -> int:
     _save_run(run)
 
     capture_operation = "v2.profile.safe_capture_evidence"
-    capture_record = journal_obj.load()["operations"].get(capture_operation)
-    if isinstance(capture_record, dict) and capture_record.get("state") == "FINALIZED_EXECUTION_FAILED":
-        retry_operation = capture_operation + ".retry"
-        retry_record = journal_obj.load()["operations"].get(retry_operation)
-        if retry_record is not None and retry_record.get("state") != "FINALIZED_EXECUTED":
-            raise SystemExit("safe capture retry operation remains unresolved")
-        capture_operation = retry_operation
+    retry_number = 0
+    while True:
+        capture_record = journal_obj.load()["operations"].get(capture_operation)
+        if not isinstance(capture_record, dict):
+            break
+        if capture_record.get("state") == "FINALIZED_EXECUTED":
+            break
+        if capture_record.get("state") != "FINALIZED_EXECUTION_FAILED":
+            raise SystemExit("safe capture operation remains unresolved")
+        retry_number += 1
+        capture_operation = (
+            "v2.profile.safe_capture_evidence.retry"
+            if retry_number == 1
+            else f"v2.profile.safe_capture_evidence.retry{retry_number}"
+        )
     capture = _submit_and_track(
         client=client, journal_obj=journal_obj, operation=capture_operation,
         kind="method", method="capture_evidence", address=governor, args=[safe_proposal_id],

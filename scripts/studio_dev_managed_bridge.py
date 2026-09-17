@@ -385,13 +385,17 @@ def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]
 
     client = make_client()
     try:
-        estimate = client.estimate_transaction_fees_for_write(
+        estimate = _safe(client.estimate_transaction_fees_for_write(
             address,
             method,
             account=SimpleNamespace(address=EXPECTED_DEPLOYER),
             args=args,
-        )
-        return _safe(estimate)
+        ))
+        if method == "capture_evidence":
+            return _capture_cli_estimate(
+                client=client, address=address, args=args, estimate=estimate,
+            )
+        return estimate
     except Exception:
         # Studio's Python simulation can fail to quote capture_evidence because
         # the method performs authenticated external retrieval during the
