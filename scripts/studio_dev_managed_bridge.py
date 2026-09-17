@@ -478,8 +478,10 @@ def _measured_review_message_allocations(
     install["parentIndex"] = MESSAGE_ALLOCATION_ROOT_PARENT_INDEX
     install["callKey"] = derive_internal_message_call_key("install_reviewed_upgrade")
     # The root node funds its own internal-message primary reserve plus the
-    # direct confirmation child emitted by install_reviewed_upgrade.
-    install["budget"] = measured_budget + measured_budget
+    # direct confirmation child emitted by install_reviewed_upgrade. Keep one
+    # measured primary reserve as explicit capacity headroom for the review
+    # path's consensus-message receipt accounting.
+    install["budget"] = measured_budget * 3
 
     confirm = dict(measured)
     confirm["messageType"] = "internal"
