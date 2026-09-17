@@ -31,6 +31,15 @@ JOURNAL_PATH = LOCAL_STATE / "transactions.json"
 HASH_RE = re.compile(r"0x[0-9a-fA-F]{64}")
 ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
+# These methods can emit internal messages and therefore must never fall back
+# to a generic zero-message quote when concrete estimation fails.
+MESSAGE_PRODUCING_METHODS = frozenset({
+    "register_with_sentinelx",
+    "review_proposal",
+    "install_reviewed_upgrade",
+    "confirm_install",
+})
+
 
 def _safe(value: Any) -> Any:
     if isinstance(value, dict):
@@ -331,13 +340,25 @@ def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]
     from types import SimpleNamespace
 
     client = make_client()
-    estimate = client.estimate_transaction_fees_for_write(
-        address,
-        method,
-        account=SimpleNamespace(address=EXPECTED_DEPLOYER),
-        args=args,
-    )
-    return _safe(estimate)
+    try:
+        estimate = client.estimate_transaction_fees_for_write(
+            address,
+            method,
+            account=SimpleNamespace(address=EXPECTED_DEPLOYER),
+            args=args,
+        )
+        return _safe(estimate)
+    except Exception:
+        # Studio's simulation cannot currently quote capture_evidence because
+        # the method performs its authenticated external retrieval during the
+        # simulation. It emits no internal message, so a fresh generic
+        # current-policy quote is safe for this one bounded fallback. Keep all
+        # message-producing methods fail-closed on concrete-estimate errors.
+        if method != "capture_evidence" or method in MESSAGE_PRODUCING_METHODS:
+            raise
+        estimate = estimate_deploy()
+        estimate["estimation_path"] = "cli_current_policy_no_message_fallback"
+        return estimate
 
 
 def _fee_options(estimate: dict[str, Any]) -> dict[str, Any]:

@@ -16,6 +16,7 @@ from scripts.fee_aware_transaction import (
     profile_entry_to_estimate_options,
 )
 from scripts.studio_dev_lifecycle import inspect_lifecycle, reconcile_genlayer
+from scripts.studio_dev_managed_bridge import MESSAGE_PRODUCING_METHODS
 from scripts.build_fee_profile import _journal_observations
 
 
@@ -30,6 +31,14 @@ SOURCE_PREFIX = "https://raw.githubusercontent.com/GIFTEDLOV/sentinelx/"
 CI_PREFIX = "https://raw.githubusercontent.com/GIFTEDLOV/sentinelx-ci/"
 COMMIT_A = "a" * 40
 COMMIT_B = "b" * 40
+
+
+def test_message_producing_methods_never_use_generic_zero_message_fallback():
+    assert {
+        "register_with_sentinelx", "review_proposal",
+        "install_reviewed_upgrade", "confirm_install",
+    } <= MESSAGE_PRODUCING_METHODS
+    assert "capture_evidence" not in MESSAGE_PRODUCING_METHODS
 
 
 class Estimator:
