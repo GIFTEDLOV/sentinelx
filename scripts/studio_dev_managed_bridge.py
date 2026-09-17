@@ -337,6 +337,47 @@ def estimate_deploy() -> dict[str, Any]:
     return _json_from_cli([cli_path(), "estimate-fees", "--rpc", RPC, "--json"])
 
 
+def _capture_cli_estimate(
+    *, client: Any, address: str, args: list[Any], estimate: dict[str, Any],
+) -> dict[str, Any]:
+    """Turn the official capture simulation recommendation into a quote.
+
+    Capture performs authenticated external retrieval and its Python SDK
+    simulation can be unavailable even though the installed CLI can quote the
+    exact call.  The CLI recommendation is still a measured lower bound, so
+    apply the repository-wide 1.25 headroom and re-quote the resulting
+    distribution through the SDK's current-policy estimator.  This remains a
+    zero-message quote; it is deliberately not used for message-producing
+    methods.
+    """
+    observed = estimate.get("observed")
+    distribution = estimate.get("distribution")
+    if not isinstance(observed, dict) or not isinstance(distribution, dict):
+        raise RuntimeError("CLI capture estimate is missing distribution or observed accounting")
+    recommended = observed.get("recommendedExecutionBudgetPerRound")
+    try:
+        recommended_budget = int(recommended)
+    except (TypeError, ValueError) as error:
+        raise RuntimeError("CLI capture estimate is missing recommended execution budget") from error
+    if recommended_budget <= 0:
+        raise RuntimeError("CLI capture estimate recommended execution budget is not positive")
+    headroom_budget = (recommended_budget * 125 + 99) // 100
+    requote_distribution = dict(distribution)
+    requote_distribution["executionBudgetPerRound"] = headroom_budget
+    requoted = _safe(client.estimate_transaction_fees(requote_distribution))
+    if not isinstance(requoted, dict) or not isinstance(requoted.get("distribution"), dict):
+        raise RuntimeError("SDK capture re-quote returned no distribution")
+    if int(requoted["distribution"].get("totalMessageFees", 0)) != 0:
+        raise RuntimeError("capture fallback unexpectedly allocated message fees")
+    return {
+        **estimate,
+        **requoted,
+        "estimation_path": "cli_exact_write_recommended_execution_headroom_1_25",
+        "capture_recommended_execution_budget": recommended_budget,
+        "capture_headroom_execution_budget": headroom_budget,
+    }
+
+
 def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]:
     # This is read-only and uses only the public signer address to build the
     # Studio simulation context.  The CLI owns all signing/broadcasting.
@@ -352,16 +393,20 @@ def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]
         )
         return _safe(estimate)
     except Exception:
-        # Studio's simulation cannot currently quote capture_evidence because
-        # the method performs its authenticated external retrieval during the
-        # simulation. It emits no internal message, so a fresh generic
-        # current-policy quote is safe for this one bounded fallback. Keep all
-        # message-producing methods fail-closed on concrete-estimate errors.
+        # Studio's Python simulation can fail to quote capture_evidence because
+        # the method performs authenticated external retrieval during the
+        # simulation. Use the installed CLI's exact-call simulation instead;
+        # keep all message-producing methods fail-closed on estimator errors.
         if method != "capture_evidence" or method in MESSAGE_PRODUCING_METHODS:
             raise
-        estimate = estimate_deploy()
-        estimate["estimation_path"] = "cli_current_policy_no_message_fallback"
-        return estimate
+        command = [
+            cli_path(), "estimate-fees", str(address), str(method),
+            "--rpc", RPC, "--json", "--args", *[_argument(value) for value in args],
+        ]
+        estimate = _json_from_cli(_cli_command(command))
+        return _capture_cli_estimate(
+            client=client, address=address, args=args, estimate=estimate,
+        )
 
 
 def _fee_options(estimate: dict[str, Any]) -> dict[str, Any]:

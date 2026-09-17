@@ -16,7 +16,7 @@ from scripts.fee_aware_transaction import (
     profile_entry_to_estimate_options,
 )
 from scripts.studio_dev_lifecycle import inspect_lifecycle, reconcile_genlayer
-from scripts.studio_dev_managed_bridge import MESSAGE_PRODUCING_METHODS
+from scripts.studio_dev_managed_bridge import MESSAGE_PRODUCING_METHODS, _capture_cli_estimate
 from scripts.build_fee_profile import _journal_observations
 
 
@@ -39,6 +39,34 @@ def test_message_producing_methods_never_use_generic_zero_message_fallback():
         "install_reviewed_upgrade", "confirm_install",
     } <= MESSAGE_PRODUCING_METHODS
     assert "capture_evidence" not in MESSAGE_PRODUCING_METHODS
+
+
+def test_capture_fallback_uses_measured_recommendation_with_headroom_and_no_messages():
+    class RequoteClient:
+        def __init__(self):
+            self.seen = None
+
+        def estimate_transaction_fees(self, distribution):
+            self.seen = distribution
+            return {"distribution": distribution, "feeValue": "123"}
+
+    client = RequoteClient()
+    result = _capture_cli_estimate(
+        client=client, address="0x" + "1" * 40, args=[1], estimate={
+            "distribution": {
+                "leaderTimeunitsAllocation": "100",
+                "validatorTimeunitsAllocation": "200",
+                "executionBudgetPerRound": "156065700000000",
+                "totalMessageFees": "0",
+                "rotations": ["3"],
+            },
+            "feeValue": "624262800010352",
+            "observed": {"recommendedExecutionBudgetPerRound": "193076100000000"},
+        },
+    )
+    assert client.seen["executionBudgetPerRound"] == 241345125000000
+    assert result["estimation_path"] == "cli_exact_write_recommended_execution_headroom_1_25"
+    assert result["distribution"]["totalMessageFees"] == "0"
 
 
 class Estimator:
