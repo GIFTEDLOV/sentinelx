@@ -1257,60 +1257,8 @@ class SentinelXGovernor(gl.contract.Contract):
             proposal.last_review_code = "STAGED_EVIDENCE_HASH_MISMATCH"
             return
         now = self._now()
-        # Materialize the storage records before entering nondeterministic
-        # execution.  Studio's composite copy may normalize ABI scalar types,
-        # so rebuild plain local records from the exact deterministic fields;
-        # this preserves the u256/Address/bytes representations used by the
-        # authenticated integrity checks.
-        gl.storage.copy_to_memory(proposal)
-        gl.storage.copy_to_memory(policy)
-        proposal_memory = ReleaseProposal(
-            proposal_id=proposal.proposal_id,
-            target=proposal.target,
-            proposer=proposal.proposer,
-            parent_version=proposal.parent_version,
-            parent_source_url=proposal.parent_source_url,
-            parent_code_hash=proposal.parent_code_hash,
-            candidate_version=proposal.candidate_version,
-            candidate_source_url=proposal.candidate_source_url,
-            candidate_code=proposal.candidate_code,
-            candidate_code_hash=proposal.candidate_code_hash,
-            ci_evidence_url=proposal.ci_evidence_url,
-            ci_evidence_id=proposal.ci_evidence_id,
-            security_evidence_url=proposal.security_evidence_url,
-            security_evidence_id=proposal.security_evidence_id,
-            evidence_set_hash=proposal.evidence_set_hash,
-            policy_fingerprint=proposal.policy_fingerprint,
-            release_intent=proposal.release_intent,
-            created_at=proposal.created_at,
-            expires_at=proposal.expires_at,
-            reviewed_at=proposal.reviewed_at,
-            execution_deadline=proposal.execution_deadline,
-            status=proposal.status,
-            last_review_code=proposal.last_review_code,
-            review_vector=proposal.review_vector,
-        )
-        policy_memory = TargetPolicy(
-            owner=policy.owner,
-            target=policy.target,
-            project_name=policy.project_name,
-            release_constitution=policy.release_constitution,
-            policy_fingerprint=policy.policy_fingerprint,
-            source_authority=policy.source_authority,
-            ci_authority=policy.ci_authority,
-            security_authority=policy.security_authority,
-            source_prefix=policy.source_prefix,
-            ci_prefix=policy.ci_prefix,
-            security_prefix=policy.security_prefix,
-            security_attestation_mode=policy.security_attestation_mode,
-            current_version=policy.current_version,
-            current_source_url=policy.current_source_url,
-            current_code_hash=policy.current_code_hash,
-            max_evidence_age_seconds=policy.max_evidence_age_seconds,
-            proposal_ttl_seconds=policy.proposal_ttl_seconds,
-            execution_timeout_seconds=policy.execution_timeout_seconds,
-            active=policy.active,
-        )
+        proposal_memory = gl.storage.copy_to_memory(proposal)
+        policy_memory = gl.storage.copy_to_memory(policy)
 
         def leader_fn() -> dict[str, object]:
             return self._independent_capture(proposal_memory, policy_memory, now)
@@ -1415,8 +1363,58 @@ class SentinelXGovernor(gl.contract.Contract):
             proposal.last_review_code = "SNAPSHOT_HASH_MISMATCH"
             return
 
-        proposal_memory = gl.storage.copy_to_memory(proposal)
-        policy_memory = gl.storage.copy_to_memory(policy)
+        # Materialize storage before nondeterministic evaluation.  Rebuild
+        # plain local records from exact fields because Studio's composite
+        # storage copy can normalize ABI scalar types.
+        gl.storage.copy_to_memory(proposal)
+        gl.storage.copy_to_memory(policy)
+        proposal_memory = ReleaseProposal(
+            proposal_id=proposal.proposal_id,
+            target=proposal.target,
+            proposer=proposal.proposer,
+            parent_version=proposal.parent_version,
+            parent_source_url=proposal.parent_source_url,
+            parent_code_hash=proposal.parent_code_hash,
+            candidate_version=proposal.candidate_version,
+            candidate_source_url=proposal.candidate_source_url,
+            candidate_code=proposal.candidate_code,
+            candidate_code_hash=proposal.candidate_code_hash,
+            ci_evidence_url=proposal.ci_evidence_url,
+            ci_evidence_id=proposal.ci_evidence_id,
+            security_evidence_url=proposal.security_evidence_url,
+            security_evidence_id=proposal.security_evidence_id,
+            evidence_set_hash=proposal.evidence_set_hash,
+            policy_fingerprint=proposal.policy_fingerprint,
+            release_intent=proposal.release_intent,
+            created_at=proposal.created_at,
+            expires_at=proposal.expires_at,
+            reviewed_at=proposal.reviewed_at,
+            execution_deadline=proposal.execution_deadline,
+            status=proposal.status,
+            last_review_code=proposal.last_review_code,
+            review_vector=proposal.review_vector,
+        )
+        policy_memory = TargetPolicy(
+            owner=policy.owner,
+            target=policy.target,
+            project_name=policy.project_name,
+            release_constitution=policy.release_constitution,
+            policy_fingerprint=policy.policy_fingerprint,
+            source_authority=policy.source_authority,
+            ci_authority=policy.ci_authority,
+            security_authority=policy.security_authority,
+            source_prefix=policy.source_prefix,
+            ci_prefix=policy.ci_prefix,
+            security_prefix=policy.security_prefix,
+            security_attestation_mode=policy.security_attestation_mode,
+            current_version=policy.current_version,
+            current_source_url=policy.current_source_url,
+            current_code_hash=policy.current_code_hash,
+            max_evidence_age_seconds=policy.max_evidence_age_seconds,
+            proposal_ttl_seconds=policy.proposal_ttl_seconds,
+            execution_timeout_seconds=policy.execution_timeout_seconds,
+            active=policy.active,
+        )
         # Copy the stored byte fields into a fresh in-memory record.  Studio's
         # composite dataclass copy can change the representation of nested
         # storage fields; copying the exact bytes before nondeterministic
