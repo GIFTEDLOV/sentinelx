@@ -711,11 +711,19 @@ def read(client: Any, address: str, method: str, args: list[Any] | None = None) 
             )
         except Exception as error:
             # Studio-dev can temporarily reject all gen_call execution slots
-            # while consensus workers drain. Reads are safe to retry; writes
-            # deliberately remain single-broadcast in submit().
-            if "Server busy: all" not in str(error) or attempt == 7:
+            # while consensus workers drain, and its public RPC can return a
+            # rolling request-window limit during a dense readback sequence.
+            # Reads are safe to retry; writes deliberately remain
+            # single-broadcast in submit().
+            message = str(error)
+            retryable = (
+                "Server busy: all" in message
+                or "Rate limit exceeded" in message
+                or "Too many requests" in message
+            )
+            if not retryable or attempt == 7:
                 raise
-            time.sleep(5)
+            time.sleep(10 if "Rate limit exceeded" in message or "Too many requests" in message else 5)
 
 
 def read_json(client: Any, address: str, method: str, args: list[Any] | None = None) -> dict[str, Any]:
