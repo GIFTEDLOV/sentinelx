@@ -555,7 +555,7 @@ def main() -> int:
             kind="method", method="register_with_sentinelx", address=safe_target,
             args=registration_args,
         )
-    except RuntimeError as error:
+    except Exception as error:
         duplicate_error = str(error)
     duplicate_record = journal_obj.load()["operations"].get(duplicate_operation)
     if duplicate_record is None:
