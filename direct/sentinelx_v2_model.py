@@ -327,11 +327,12 @@ class SentinelXV2Model:
         if value["policy_fingerprint"] != proposal.policy_fingerprint:
             return "EVIDENCE_POLICY_BINDING"
         published, expires = value["published_at"], value["expires_at"]
+        evidence_now = max(self.now, proposal.created_at)
         if type(published) is not int or type(expires) is not int:
             return "EVIDENCE_TIMESTAMP_INVALID"
-        if published > self.now or self.now - published > self.policies[proposal.target].max_age:
+        if published > evidence_now or evidence_now - published > self.policies[proposal.target].max_age:
             return "EVIDENCE_STALE"
-        if expires < self.now or expires < published:
+        if expires < evidence_now or expires < published:
             return "EVIDENCE_EXPIRED"
         return ""
 

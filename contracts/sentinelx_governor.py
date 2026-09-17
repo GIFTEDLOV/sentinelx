@@ -256,6 +256,14 @@ class SentinelXGovernor(gl.contract.Contract):
         raw = str(gl.message.raw["datetime"])
         return int(datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp())
 
+    def _evidence_now(self, proposal: ReleaseProposal, observed_now: int) -> int:
+        # A Studio-dev simulation may evaluate a call against an older
+        # execution-clock context while still loading the proposal state. The
+        # proposal's committed creation time is a safe lower bound: evidence
+        # published before proposal creation is never treated as future, while
+        # a live capture still uses the later observed time when available.
+        return max(int(observed_now), int(proposal.created_at))
+
     def _text_ok(self, value: str, label: str, minimum: int, maximum: int) -> None:
         size = len(value.encode("utf-8"))
         if size < minimum or size > maximum:
@@ -753,6 +761,7 @@ class SentinelXGovernor(gl.contract.Contract):
     def _independent_capture(
         self, proposal: ReleaseProposal, policy: TargetPolicy, capture_now: int
     ) -> dict[str, object]:
+        validation_now = self._evidence_now(proposal, capture_now)
         parent_status, parent_bytes = self._fetch_bytes(proposal.parent_source_url)
         if parent_status.startswith("RETRY"):
             return self._capture_error(proposal, "PARENT_" + parent_status, retry=True)
@@ -801,7 +810,7 @@ class SentinelXGovernor(gl.contract.Contract):
             proposal.ci_evidence_id,
             policy.ci_authority,
             proposal,
-            capture_now,
+            validation_now,
             int(policy.max_evidence_age_seconds),
         )
         if ci_error:
@@ -838,7 +847,7 @@ class SentinelXGovernor(gl.contract.Contract):
                 proposal.security_evidence_id,
                 policy.security_authority,
                 proposal,
-                capture_now,
+                validation_now,
                 int(policy.max_evidence_age_seconds),
             )
             if security_error:
@@ -922,7 +931,7 @@ class SentinelXGovernor(gl.contract.Contract):
             proposal.ci_evidence_id,
             policy.ci_authority,
             proposal,
-            self._now(),
+            self._evidence_now(proposal, self._now()),
             int(policy.max_evidence_age_seconds),
         )
         if ci_error:
@@ -967,7 +976,7 @@ class SentinelXGovernor(gl.contract.Contract):
                 proposal.security_evidence_id,
                 policy.security_authority,
                 proposal,
-                self._now(),
+                self._evidence_now(proposal, self._now()),
                 int(policy.max_evidence_age_seconds),
             )
             if security_error:
