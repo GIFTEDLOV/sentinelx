@@ -349,7 +349,7 @@ def _write_outputs(run: dict[str, Any], journal_obj: Any, preflight: dict[str, A
         "network": {"name": NETWORK, "rpc": RPC, "chain_id": CHAIN_ID, "profile_only": True},
         "toolchain": run.get("toolchain", {}),
         "gates": {
-            "direct_tests": {"count": 128, "result": "PASS"},
+            "direct_tests": {"count": 129, "result": "PASS"},
             "mutation_tests": {"count": 35, "killed": 35, "result": "PASS", "surviving": []},
             "static_lint": "PASS",
             "semantic_validation": "PASS",

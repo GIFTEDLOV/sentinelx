@@ -355,10 +355,9 @@ def _capture_cli_estimate(
     if not isinstance(observed, dict) or not isinstance(distribution, dict):
         raise RuntimeError("CLI capture estimate is missing distribution or observed accounting")
     recommended = observed.get("recommendedExecutionBudgetPerRound")
-    try:
-        recommended_budget = int(recommended)
-    except (TypeError, ValueError) as error:
-        raise RuntimeError("CLI capture estimate is missing recommended execution budget") from error
+    if not isinstance(recommended, (str, int)):
+        raise RuntimeError("CLI capture estimate is missing recommended execution budget")
+    recommended_budget = int(recommended)
     if recommended_budget <= 0:
         raise RuntimeError("CLI capture estimate recommended execution budget is not positive")
     headroom_budget = (recommended_budget * 125 + 99) // 100

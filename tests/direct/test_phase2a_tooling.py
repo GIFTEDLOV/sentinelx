@@ -64,6 +64,7 @@ def test_capture_fallback_uses_measured_recommendation_with_headroom_and_no_mess
             "observed": {"recommendedExecutionBudgetPerRound": "193076100000000"},
         },
     )
+    assert client.seen is not None
     assert client.seen["executionBudgetPerRound"] == 241345125000000
     assert result["estimation_path"] == "cli_exact_write_recommended_execution_headroom_1_25"
     assert result["distribution"]["totalMessageFees"] == "0"
