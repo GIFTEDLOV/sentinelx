@@ -607,63 +607,75 @@ def main() -> int:
         _source_url("contracts/protected_app_v1.py"), PARENT_HASH,
         86_400, 3_600, 3_600,
     ]
-    recovery_before = {
-        "governor": read(client, governor, "is_target_registered", [recovery_target]),
-        "target": read(client, recovery_target, "is_registered_with_sentinelx"),
-    }
-    if recovery_before != {"governor": False, "target": False}:
-        raise SystemExit("fresh recovery target was not unregistered")
-    malformed = list(recovery_args)
-    malformed[11] = "not-a-sha256"
-    recovery_failure_operation = "v2.1.profile.recovery_registration_malformed"
-    recovery_failure_error = ""
-    try:
-        _submit_and_track(
-            client=client, journal_obj=journal_obj, operation=recovery_failure_operation,
-            kind="method", method="register_with_sentinelx", address=recovery_target,
-            args=malformed, child_methods=["register_target"],
-        )
-    except RuntimeError as error:
-        recovery_failure_error = str(error)
-    recovery_failure_record = _operation_record(journal_obj, recovery_failure_operation)
-    recovery_child_ids = recovery_failure_record.get("triggered_transaction_ids", [])
-    if recovery_failure_record.get("state") != "FINALIZED_EXECUTED" or len(recovery_child_ids) != 1:
-        raise SystemExit("malformed recovery parent did not finalize with exactly one child")
-    recovery_child_operation = f"{recovery_failure_operation}.child.0"
-    recovery_child_record = _operation_record(journal_obj, recovery_child_operation)
-    if recovery_child_record.get("state") != "FINALIZED_EXECUTION_FAILED":
-        raise SystemExit("malformed recovery child did not finalize as a failure")
-    recovery_after_failure = {
-        "governor": read(client, governor, "is_target_registered", [recovery_target]),
-        "target": read(client, recovery_target, "is_registered_with_sentinelx"),
-    }
-    if recovery_after_failure != {"governor": False, "target": False}:
-        raise SystemExit("failed recovery child poisoned target registration state")
-    recovery_retry_operation = "v2.1.profile.recovery_registration_retry"
-    recovery_retry = _submit_and_track(
-        client=client, journal_obj=journal_obj, operation=recovery_retry_operation,
-        kind="method", method="register_with_sentinelx", address=recovery_target,
-        args=recovery_args, child_methods=["register_target"],
+    recovery_complete = (
+        isinstance(run.get("recovery_registration"), dict)
+        and run["recovery_registration"].get("after_retry") == {"governor": True, "target": True}
     )
-    _tag(journal_obj, recovery_retry_operation, method="register_with_sentinelx")
-    recovery_after_retry = {
-        "governor": read(client, governor, "is_target_registered", [recovery_target]),
-        "target": read(client, recovery_target, "is_registered_with_sentinelx"),
-    }
-    if recovery_after_retry != {"governor": True, "target": True}:
-        raise SystemExit("corrected recovery registration did not become registered")
-    run["recovery_registration"] = {
-        "malformed_parent_tx": recovery_failure_record.get("tx_hash"),
-        "malformed_child_tx": recovery_child_ids[0],
-        "malformed_parent_result": recovery_failure_record.get("execution_result"),
-        "malformed_child_result": recovery_child_record.get("execution_result"),
-        "malformed_error": recovery_failure_error,
-        "after_failure": recovery_after_failure,
-        "retry_parent_tx": recovery_retry["tx_hash"],
-        "retry_child_txs": recovery_retry.get("children", []),
-        "after_retry": recovery_after_retry,
-    }
-    _save_run(run)
+    if recovery_complete:
+        recovery_after_retry = {
+            "governor": read(client, governor, "is_target_registered", [recovery_target]),
+            "target": read(client, recovery_target, "is_registered_with_sentinelx"),
+        }
+        if recovery_after_retry != {"governor": True, "target": True}:
+            raise SystemExit("completed recovery target no longer reports registered")
+    else:
+        recovery_before = {
+            "governor": read(client, governor, "is_target_registered", [recovery_target]),
+            "target": read(client, recovery_target, "is_registered_with_sentinelx"),
+        }
+        if recovery_before != {"governor": False, "target": False}:
+            raise SystemExit("fresh recovery target was not unregistered")
+        malformed = list(recovery_args)
+        malformed[11] = "not-a-sha256"
+        recovery_failure_operation = "v2.1.profile.recovery_registration_malformed"
+        recovery_failure_error = ""
+        try:
+            _submit_and_track(
+                client=client, journal_obj=journal_obj, operation=recovery_failure_operation,
+                kind="method", method="register_with_sentinelx", address=recovery_target,
+                args=malformed, child_methods=["register_target"],
+            )
+        except RuntimeError as error:
+            recovery_failure_error = str(error)
+        recovery_failure_record = _operation_record(journal_obj, recovery_failure_operation)
+        recovery_child_ids = recovery_failure_record.get("triggered_transaction_ids", [])
+        if recovery_failure_record.get("state") != "FINALIZED_EXECUTED" or len(recovery_child_ids) != 1:
+            raise SystemExit("malformed recovery parent did not finalize with exactly one child")
+        recovery_child_operation = f"{recovery_failure_operation}.child.0"
+        recovery_child_record = _operation_record(journal_obj, recovery_child_operation)
+        if recovery_child_record.get("state") != "FINALIZED_EXECUTION_FAILED":
+            raise SystemExit("malformed recovery child did not finalize as a failure")
+        recovery_after_failure = {
+            "governor": read(client, governor, "is_target_registered", [recovery_target]),
+            "target": read(client, recovery_target, "is_registered_with_sentinelx"),
+        }
+        if recovery_after_failure != {"governor": False, "target": False}:
+            raise SystemExit("failed recovery child poisoned target registration state")
+        recovery_retry_operation = "v2.1.profile.recovery_registration_retry"
+        recovery_retry = _submit_and_track(
+            client=client, journal_obj=journal_obj, operation=recovery_retry_operation,
+            kind="method", method="register_with_sentinelx", address=recovery_target,
+            args=recovery_args, child_methods=["register_target"],
+        )
+        _tag(journal_obj, recovery_retry_operation, method="register_with_sentinelx")
+        recovery_after_retry = {
+            "governor": read(client, governor, "is_target_registered", [recovery_target]),
+            "target": read(client, recovery_target, "is_registered_with_sentinelx"),
+        }
+        if recovery_after_retry != {"governor": True, "target": True}:
+            raise SystemExit("corrected recovery registration did not become registered")
+        run["recovery_registration"] = {
+            "malformed_parent_tx": recovery_failure_record.get("tx_hash"),
+            "malformed_child_tx": recovery_child_ids[0],
+            "malformed_parent_result": recovery_failure_record.get("execution_result"),
+            "malformed_child_result": recovery_child_record.get("execution_result"),
+            "malformed_error": recovery_failure_error,
+            "after_failure": recovery_after_failure,
+            "retry_parent_tx": recovery_retry["tx_hash"],
+            "retry_child_txs": recovery_retry.get("children", []),
+            "after_retry": recovery_after_retry,
+        }
+        _save_run(run)
 
     safe_ci = run.get("safe_ci")
     if not isinstance(safe_ci, dict) or not safe_ci.get("fetched_verified"):
