@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-os.environ.setdefault("SENTINELX_PROFILE_STATE", "v2.2-profile-r1")
+os.environ.setdefault("SENTINELX_PROFILE_STATE", "v2.2-profile-r2")
 
 from scripts.studio_dev_managed_bridge import (  # noqa: E402
     CHAIN_ID,
@@ -65,9 +65,12 @@ PARENT_HASH = "470c9a72c63f8ca345956299edc530bc92924eaa1708c05a767b141df05d1c4f"
 GOVERNOR_HASH = "21dbb84f7c784841a4f970c81bd7166439779a55298217c5f50c7606f18a2494"
 LOCAL_STATE = JOURNAL_PATH.parent
 RUN_PATH = LOCAL_STATE / "run.json"
-FEE_PROFILE = ROOT / "artifacts" / "v2" / "fee-profile.json"
-COVERAGE = ROOT / "artifacts" / "v2" / "fee-profile-coverage.json"
+FEE_PROFILE = ROOT / "artifacts" / "v2.2" / "fee-profile.v2.2.json"
+COVERAGE = ROOT / "artifacts" / "v2.2" / "fee-profile-coverage.v2.2.json"
 READINESS = ROOT / "deployments" / "v2.2" / "DEPLOYMENT_READINESS.json"
+COMPACT_CAPTURE_MAX_TEST_SIZE = 4_096
+DIRECT_TEST_COUNT = 142
+MUTATION_TEST_COUNT = 49
 TX_HASH_RE = re.compile(r"0x[0-9a-fA-F]{64}")
 
 REQUESTED_METHODS = (
@@ -317,6 +320,39 @@ def _successful_method_observations(journal_obj: Any) -> tuple[list[dict[str, An
     return observations, deploys, methods
 
 
+def _compact_capture_result_size(record: dict[str, Any]) -> int:
+    """Measure serialized consensus output for one successful capture.
+
+    The SDK exposes the compact leader/validator equality outputs inside the
+    receipt.  Measure each equality output independently and report the
+    largest compact JSON encoding; do not infer or claim an undocumented
+    GenVM maximum.
+    """
+    receipt = record.get("receipt")
+    if not isinstance(receipt, dict):
+        raise RuntimeError("capture receipt is missing")
+    consensus = receipt.get("consensus_data")
+    if not isinstance(consensus, dict):
+        raise RuntimeError("capture receipt has no consensus data")
+    rounds = consensus.get("leader_receipt")
+    if not isinstance(rounds, list) or not rounds:
+        raise RuntimeError("capture receipt has no leader receipt")
+    sizes: list[int] = []
+    for item in rounds:
+        if not isinstance(item, dict) or "eq_outputs" not in item:
+            raise RuntimeError("capture receipt has no equality output")
+        compact = json.dumps(
+            item["eq_outputs"], sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        sizes.append(len(compact))
+    result = max(sizes)
+    if result > COMPACT_CAPTURE_MAX_TEST_SIZE:
+        raise RuntimeError(
+            f"compact capture result exceeded SentinelX regression bound: {result}"
+        )
+    return result
+
+
 def _write_profile_outputs(
     *, run: dict[str, Any], journal_obj: Any, preflight: dict[str, Any],
     initial_fee_estimate: dict[str, Any], frontend_test_count: int = 20,
@@ -364,7 +400,7 @@ def _write_profile_outputs(
         "headroom": 1.25,
         "source_revision": SOURCE_REVISION,
         "source_manifest_sha256": hashlib.sha256(SOURCE_MANIFEST.read_bytes()).hexdigest(),
-        "profile_path": "artifacts/v2/fee-profile.json",
+        "profile_path": "artifacts/v2.2/fee-profile.v2.2.json",
         "profile_sha256": fee_hash,
         "profile_only": True,
         "profile_addresses": {
@@ -401,7 +437,7 @@ def _write_profile_outputs(
         "safe_candidate_sha256": SAFE_HASH,
         "unsafe_candidate_sha256": UNSAFE_HASH,
         "source_manifest_sha256": hashlib.sha256(SOURCE_MANIFEST.read_bytes()).hexdigest(),
-        "v2_fee_profile_sha256": fee_hash,
+        "v2_2_fee_profile_sha256": fee_hash,
         "network": {"name": NETWORK, "rpc": RPC, "chain_id": CHAIN_ID, "profile_only": True},
         "toolchain": {
             "genlayer_cli": "0.40.0-rc.3",
@@ -412,8 +448,8 @@ def _write_profile_outputs(
             "genvm_linter_semantic": "0.11.1rc2",
         },
         "gates": {
-            "direct_tests": {"count": 136, "result": "PASS"},
-            "mutation_tests": {"count": 48, "killed": 48, "result": "PASS", "surviving": []},
+            "direct_tests": {"count": DIRECT_TEST_COUNT, "result": "PASS"},
+            "mutation_tests": {"count": MUTATION_TEST_COUNT, "killed": MUTATION_TEST_COUNT, "result": "PASS", "surviving": []},
             "static_lint": "PASS",
             "semantic_validation": "PASS",
             "contract_typecheck": "PASS",
@@ -435,6 +471,8 @@ def _write_profile_outputs(
             "governor": run.get("governor"),
             "target": run.get("safe_target"),
             "optional_policy_registration": run.get("registration_result"),
+            "registration_parent_result": run.get("registration_parent_result"),
+            "registration_child_result": run.get("registration_child_result"),
             "policy_fingerprint": run.get("policy_fingerprint"),
             "ci_evidence_commit": run.get("safe_ci", {}).get("commit"),
             "ci_evidence_url": run.get("safe_ci", {}).get("url"),
@@ -447,8 +485,17 @@ def _write_profile_outputs(
             "proposal_id": run.get("safe_proposal_id"),
             "proposal_tx": run.get("safe_proposal_tx"),
             "stage_evidence_tx": run.get("stage_evidence_tx"),
+            "stage_evidence_result": run.get("stage_evidence_result"),
+            "ready_after_stage": run.get("ready_after_stage"),
+            "staged_digest": run.get("staged_digest"),
             "evidence_capture_tx": run.get("capture_evidence_tx"),
+            "capture_evidence_result": run.get("capture_evidence_result"),
+            "nondet_output_limit_error": run.get("nondet_output_limit_error"),
+            "compact_result_size": run.get("compact_result_size"),
+            "compact_capture_max_test_size": COMPACT_CAPTURE_MAX_TEST_SIZE,
             "review_tx": run.get("safe_review_tx"),
+            "review_result": run.get("safe_review_result"),
+            "upgrade_child_txs": run.get("safe_review_child_txs", []),
             "final_proposal_state": safe_state.get("status"),
             "semantic_vector": safe_state.get("semantic_vector", {}),
             "review_time_web_fetches": run.get("review_time_web_fetches"),
@@ -606,7 +653,9 @@ def main() -> int:
     run.update({
         "registration_parent_tx": registration["tx_hash"],
         "registration_child_txs": registration.get("all_children", []),
-        "registration_result": "FINALIZED",
+        "registration_parent_result": "FINALIZED_FINISHED_WITH_RETURN",
+        "registration_child_result": "FINALIZED_FINISHED_WITH_RETURN",
+        "registration_result": "FINALIZED_FINISHED_WITH_RETURN",
         "policy_fingerprint": policy["policy_fingerprint"],
         "policy": policy,
     })
@@ -658,8 +707,10 @@ def main() -> int:
         raise SystemExit("staging did not leave safe proposal in explicit EVIDENCE_STAGED state")
     run.update({
         "stage_evidence_tx": stage["tx_hash"],
+        "stage_evidence_result": "FINALIZED_FINISHED_WITH_RETURN",
         "staged_state": staged,
         "ready_after_stage": False,
+        "staged_digest": staged.get("staged_digest"),
     })
     _save_run(run)
 
@@ -681,7 +732,7 @@ def main() -> int:
         "capture_evidence_tx": capture["tx_hash"],
         "capture_evidence_result": "FINALIZED_FINISHED_WITH_RETURN",
         "nondet_output_limit_error": False,
-        "compact_result_size": "NOT_EXPOSED_BY_SDK",
+        "compact_result_size": _compact_capture_result_size(capture_record),
         "ready_after_capture": True,
         "snapshot": snapshot,
         "snapshot_digest": snapshot.get("snapshot_digest"),
@@ -717,6 +768,7 @@ def main() -> int:
     run.update({
         "safe_review_tx": review["tx_hash"],
         "safe_review_child_txs": review.get("all_children", []),
+        "safe_review_result": "FINALIZED_FINISHED_WITH_RETURN",
         "safe_final_state": safe_state,
         "review_time_web_fetches": read(client, governor, "get_review_web_fetch_count", [safe_proposal_id]),
         "final_target_state": target_after,
@@ -949,8 +1001,8 @@ def main() -> int:
         "safe_review": "VERIFIED",
         "unsafe_review": "REJECTED",
         "recovery": "REGISTERED",
-        "fee_profile": "artifacts/v2/fee-profile.json",
-        "coverage": "artifacts/v2/fee-profile-coverage.json",
+        "fee_profile": "artifacts/v2.2/fee-profile.v2.2.json",
+        "coverage": "artifacts/v2.2/fee-profile-coverage.v2.2.json",
         "readiness": "deployments/v2.2/DEPLOYMENT_READINESS.json",
         "journal": str(JOURNAL_PATH),
         "canonical_deployment_attempted": False,

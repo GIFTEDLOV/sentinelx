@@ -17,6 +17,7 @@ from direct.sentinelx_v2_model import (
     REPAIR,
     REQUIRED_INDEPENDENT,
     RETRY,
+    COMPACT_CAPTURE_MAX_TEST_SIZE,
     SentinelXV2Model,
     SentinelXV2TargetModel,
     SentinelXError,
@@ -292,13 +293,43 @@ def test_staging_rejects_wrong_ci_bindings():
                              ci_evidence_bytes=bad, caller=OWNER)
 
 
+@pytest.mark.parametrize("field", ("target", "parent_sha256", "candidate_sha256", "policy_fingerprint"))
+def test_staging_rejects_each_ci_binding(field: str):
+    model = SentinelXV2Model(NOW)
+    register(model)
+    proposal = create(model)
+    value = json.loads(ci_body(proposal))
+    value[field] = "0x" + "b" * 40 if field == "target" else "0" * 64
+    with pytest.raises(SentinelXError, match="CI EVIDENCE_"):
+        model.stage_evidence(
+            proposal.proposal_id,
+            parent_source_bytes=PARENT,
+            ci_evidence_bytes=json.dumps(value).encode(),
+            caller=OWNER,
+        )
+
+
+def test_staging_rejects_a_frozen_candidate_hash_mismatch():
+    model = SentinelXV2Model(NOW)
+    register(model)
+    proposal = create(model)
+    proposal.candidate_code_hash = "0" * 64
+    with pytest.raises(SentinelXError, match="Frozen candidate hash"):
+        model.stage_evidence(
+            proposal.proposal_id,
+            parent_source_bytes=PARENT,
+            ci_evidence_bytes=ci_body(proposal),
+            caller=OWNER,
+        )
+
+
 def test_compact_capture_result_contains_no_bulk_artifacts_and_is_bounded():
     model, proposal = prepared()
     compact = model._compact_capture_result(
         proposal, PARENT, CANDIDATE, ci_body(proposal), b"", False
     )
     rendered = json.dumps(compact, sort_keys=True, separators=(",", ":"))
-    assert len(rendered) < 4_096
+    assert len(rendered) <= COMPACT_CAPTURE_MAX_TEST_SIZE
     assert PARENT.hex() not in rendered
     assert CANDIDATE.hex() not in rendered
     assert all("bytes" not in key and "hex" not in key for key in compact)
@@ -470,6 +501,14 @@ def test_transient_capture_failure_is_recoverable_without_review_dead_end():
                           ci_evidence_url=CI_URL, ci_evidence_id=proposal.ci_evidence_id,
                           caller=OWNER)
     assert proposal.status == PROPOSED
+
+
+def test_permanent_immutable_evidence_failure_is_repairable():
+    model, proposal = prepared()
+    unavailable = {**web_for(proposal), proposal.ci_evidence_url: (404, b"")}
+    assert model.capture_evidence(proposal.proposal_id, web=unavailable, caller=OWNER) == REPAIR
+    assert proposal.status == REPAIR
+    assert proposal.evidence_identity not in model.snapshots
 
 
 def test_review_performs_zero_web_fetches():

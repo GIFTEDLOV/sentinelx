@@ -1185,6 +1185,12 @@ def _mutations() -> tuple[Mutation, ...]:
             '        if proposal.status not in (STATUS_EVIDENCE_STAGED, STATUS_EVIDENCE_READY, STATUS_REVIEW_RETRY_REQUIRED):\n', "unattested review lifecycle"),
             _source('        if caller != policy.owner or proposal.status not in (EVIDENCE_READY, RETRY):\n',
                     '        if caller != policy.owner or proposal.status not in (EVIDENCE_STAGED, EVIDENCE_READY, RETRY):\n', "unattested review lifecycle oracle"), probe_unattested_review, gate_unattested_review),
+        Mutation(49, "return security bytes from compact nondet capture", governor, _source(
+            '        result["security_sha256"] = _sha256_hex(security_bytes) if security_present else ""\n',
+            '        result["security_bytes_hex"] = security_bytes.hex()\n        result["security_sha256"] = _sha256_hex(security_bytes) if security_present else ""\n', "compact security output"),
+            _source('            "security_sha256": sha256_hex(security_raw) if security_present else "",\n',
+                    '            "security_bytes_hex": security_raw.hex(),\n            "security_sha256": sha256_hex(security_raw) if security_present else "",\n', "compact security output oracle"),
+            lambda m: probe_compact_output(m, "security_bytes_hex"), gate_compact_output),
     )
 
 

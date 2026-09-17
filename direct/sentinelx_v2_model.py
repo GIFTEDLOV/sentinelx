@@ -36,6 +36,9 @@ EXECUTION_FAILED = "EXECUTION_FAILED"
 MAX_PARENT_SOURCE_BYTES = 16_384
 MAX_CI_EVIDENCE_BYTES = 16_384
 MAX_SECURITY_EVIDENCE_BYTES = 32_768
+# SentinelX's own regression bound for the serialized nondeterministic
+# capture result.  This is a repository invariant, not a claimed GenVM limit.
+COMPACT_CAPTURE_MAX_TEST_SIZE = 4_096
 
 
 def _hash_parts(*parts: str) -> str:

@@ -29,6 +29,8 @@ def _source_record(relative_path: str) -> dict[str, Any]:
 
 
 def build_manifest() -> dict[str, Any]:
+    contracts = [_source_record(path) for path in CONTRACT_PATHS]
+    by_path = {record["path"]: record for record in contracts}
     return {
         "schema": "sentinelx-v2.2-source-manifest-v1",
         "contract_version": "SentinelX V2.2",
@@ -45,7 +47,17 @@ def build_manifest() -> dict[str, Any]:
             "genvm_linter_static": "0.11.0",
             "genvm_linter_semantic": "0.11.1rc2",
         },
-        "contracts": [_source_record(path) for path in CONTRACT_PATHS],
+        "contracts": contracts,
+        "governor_sha256": by_path["contracts/sentinelx_governor.py"]["sha256"],
+        "baseline_target_sha256": by_path["contracts/protected_app_v1.py"]["sha256"],
+        "safe_candidate_sha256": by_path["contracts/protected_app_v2_safe.py"]["sha256"],
+        "unsafe_candidate_sha256": by_path["contracts/protected_app_v2_unsafe.py"]["sha256"],
+        "byte_counts": {
+            "governor": by_path["contracts/sentinelx_governor.py"]["bytes"],
+            "baseline_target": by_path["contracts/protected_app_v1.py"]["bytes"],
+            "safe_candidate": by_path["contracts/protected_app_v2_safe.py"]["bytes"],
+            "unsafe_candidate": by_path["contracts/protected_app_v2_unsafe.py"]["bytes"],
+        },
     }
 
 
@@ -71,6 +83,30 @@ def verify_manifest(manifest: dict[str, Any] | None = None) -> list[str]:
             errors.append(f"source hash mismatch: {record['path']}")
         if len(data) != record.get("bytes"):
             errors.append(f"source byte count mismatch: {record['path']}")
+    aliases = {
+        "governor_sha256": "contracts/sentinelx_governor.py",
+        "baseline_target_sha256": "contracts/protected_app_v1.py",
+        "safe_candidate_sha256": "contracts/protected_app_v2_safe.py",
+        "unsafe_candidate_sha256": "contracts/protected_app_v2_unsafe.py",
+    }
+    for field, path_name in aliases.items():
+        record = next(record for record in records if record.get("path") == path_name)
+        if value.get(field) != record.get("sha256"):
+            errors.append(f"manifest {field} mismatch")
+    counts = value.get("byte_counts")
+    expected_counts = {
+        "governor": "contracts/sentinelx_governor.py",
+        "baseline_target": "contracts/protected_app_v1.py",
+        "safe_candidate": "contracts/protected_app_v2_safe.py",
+        "unsafe_candidate": "contracts/protected_app_v2_unsafe.py",
+    }
+    if not isinstance(counts, dict):
+        errors.append("manifest byte_counts missing")
+    else:
+        for field, path_name in expected_counts.items():
+            record = next(record for record in records if record.get("path") == path_name)
+            if counts.get(field) != record.get("bytes"):
+                errors.append(f"manifest byte_counts.{field} mismatch")
     return errors
 
 

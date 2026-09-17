@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from types import SimpleNamespace
 from typing import Any
@@ -40,6 +41,7 @@ MESSAGE_PRODUCING_METHODS = frozenset({
     "install_reviewed_upgrade",
     "confirm_install",
 })
+_TEMP_CLI_ARGUMENT_FILES: set[Path] = set()
 
 
 def _safe(value: Any) -> Any:
@@ -215,12 +217,29 @@ def _cli_command(command: list[str]) -> list[str]:
     those ``--args`` object tokens fall through to the CLI's string parser.
     The shim never handles accounts, keychains, or signing material.
     """
+    original_args = command[1:]
+    scan_command = command
+    args_file: Path | None = None
+    # Windows process creation and the RC CLI's argument parser both reject
+    # large b# hex payloads as command-line arguments. Keep the same CLI and
+    # managed keystore path, but let the process-local Node shim load the
+    # exact argv vector from a short-lived file. The file contains only the
+    # user-supplied public calldata; it never contains credentials.
+    if sum(len(value) + 1 for value in original_args) > 6_000:
+        handle = tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".json", delete=False,
+        )
+        with handle:
+            json.dump(original_args, handle, separators=(",", ":"))
+        args_file = Path(handle.name)
+        _TEMP_CLI_ARGUMENT_FILES.add(args_file)
+        command = [command[0], "--sentinelx-args-file", str(args_file)]
     try:
-        args_index = command.index("--args")
+        args_index = scan_command.index("--args")
     except ValueError:
         args_index = -1
     json_object_args: list[str] = []
-    for value in command[args_index + 1 :] if args_index >= 0 else []:
+    for value in scan_command[args_index + 1 :] if args_index >= 0 else []:
         if not value.startswith("{"):
             continue
         try:
@@ -237,6 +256,10 @@ def _cli_command(command: list[str]) -> list[str]:
         raise RuntimeError("installed GenLayer CLI entrypoint was not found")
     forced = json.dumps(json_object_args, separators=(",", ":"))
     module_url = package_dist.as_uri()
+    argv_source = (
+        f"JSON.parse(fs.readFileSync({json.dumps(str(args_file))}, 'utf8'))"
+        if args_file is not None else "process.argv.slice(1)"
+    )
     script = (
         "import fs from 'node:fs';"
         "const originalParse = JSON.parse;"
@@ -266,10 +289,16 @@ def _cli_command(command: list[str]) -> list[str]:
         "};"
         # `node -e` omits the script path from argv; the CLI expects the
         # ordinary `[node, script, command, ...]` layout.
-        "process.argv = [process.argv[0], 'genlayer', ...process.argv.slice(1)];"
+        f"process.argv = [process.argv[0], 'genlayer', ...{argv_source}];"
         f"await import({json.dumps(module_url)});"
     )
     return [node, "--input-type=module", "-e", script, *command[1:]]
+
+
+def _cleanup_cli_argument_files() -> None:
+    for path in list(_TEMP_CLI_ARGUMENT_FILES):
+        path.unlink(missing_ok=True)
+        _TEMP_CLI_ARGUMENT_FILES.discard(path)
 
 
 def _run_cli(
@@ -278,60 +307,66 @@ def _run_cli(
 ) -> tuple[str | None, int]:
     """Run one CLI command and capture/persist the first labeled hash."""
     command = _cli_command(command)
-    process = subprocess.Popen(
-        command,
-        cwd=ROOT,
-        env=_cli_environment(),
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        bufsize=1,
-    )
-    found: str | None = None
-    assert process.stdout is not None
-    for line in process.stdout:
-        clean = ANSI_RE.sub("", line)
-        if found is None:
-            managed_match = re.search(
-                r"SENTINELX_MANAGED_TRANSACTION_HASH[^0-9a-fA-F]*(0x[0-9a-fA-F]{64})",
-                clean,
-                re.IGNORECASE,
-            )
-            match = managed_match or (pattern.search(clean) if pattern is not None else None)
-            if match:
-                found = _hash_text(match.group(1))
-                if on_hash is not None:
-                    on_hash(found)
-    return_code = process.wait()
-    return found, return_code
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=ROOT,
+            env=_cli_environment(),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+        )
+        found: str | None = None
+        assert process.stdout is not None
+        for line in process.stdout:
+            clean = ANSI_RE.sub("", line)
+            if found is None:
+                managed_match = re.search(
+                    r"SENTINELX_MANAGED_TRANSACTION_HASH[^0-9a-fA-F]*(0x[0-9a-fA-F]{64})",
+                    clean,
+                    re.IGNORECASE,
+                )
+                match = managed_match or (pattern.search(clean) if pattern is not None else None)
+                if match:
+                    found = _hash_text(match.group(1))
+                    if on_hash is not None:
+                        on_hash(found)
+        return_code = process.wait()
+        return found, return_code
+    finally:
+        _cleanup_cli_argument_files()
 
 
 def _json_from_cli(command: list[str]) -> dict[str, Any]:
-    process = subprocess.run(
-        command,
-        cwd=ROOT,
-        env=_cli_environment(),
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
-    if process.returncode != 0:
-        raise RuntimeError("CLI fee estimation failed")
-    for line in reversed(ANSI_RE.sub("", process.stdout).splitlines()):
-        try:
-            value = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(value, dict):
-            return value
-    raise RuntimeError("CLI fee estimation returned no JSON object")
+    try:
+        process = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=_cli_environment(),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        if process.returncode != 0:
+            raise RuntimeError("CLI fee estimation failed: " + process.stdout[-1200:])
+        for line in reversed(ANSI_RE.sub("", process.stdout).splitlines()):
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, dict):
+                return value
+        raise RuntimeError("CLI fee estimation returned no JSON object")
+    finally:
+        _cleanup_cli_argument_files()
 
 
 def estimate_deploy() -> dict[str, Any]:
@@ -397,20 +432,22 @@ def estimate_write(address: str, method: str, args: list[Any]) -> dict[str, Any]
             )
         return estimate
     except Exception:
-        # Studio's Python simulation can fail to quote capture_evidence because
-        # the method performs authenticated external retrieval during the
-        # simulation. Use the installed CLI's exact-call simulation instead;
-        # keep all message-producing methods fail-closed on estimator errors.
-        if method != "capture_evidence" or method in MESSAGE_PRODUCING_METHODS:
+        # Use the installed CLI's exact-call simulation when Python's SDK
+        # simulator cannot quote a concrete method. Keep all message-
+        # producing methods fail-closed on estimator errors, because a generic
+        # quote could omit their child-message allocation tree.
+        if method in MESSAGE_PRODUCING_METHODS:
             raise
         command = [
             cli_path(), "estimate-fees", str(address), str(method),
             "--rpc", RPC, "--json", "--args", *[_argument(value) for value in args],
         ]
         estimate = _json_from_cli(_cli_command(command))
-        return _capture_cli_estimate(
-            client=client, address=address, args=args, estimate=estimate,
-        )
+        if method == "capture_evidence":
+            return _capture_cli_estimate(
+                client=client, address=address, args=args, estimate=estimate,
+            )
+        return estimate
 
 
 def _fee_options(estimate: dict[str, Any]) -> dict[str, Any]:
