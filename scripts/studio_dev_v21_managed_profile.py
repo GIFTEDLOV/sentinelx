@@ -18,6 +18,7 @@ import subprocess
 import sys
 import time
 from typing import Any
+from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -260,8 +261,18 @@ def _publish_ci_evidence(
 
     url = f"{CI_PREFIX}{commit_sha}/{relative.as_posix()}"
     request = Request(url, headers={"User-Agent": "SentinelX-V2-profile"})
-    with urlopen(request, timeout=60) as response:
-        fetched = response.read()
+    fetched: bytes | None = None
+    for attempt in range(4):
+        try:
+            with urlopen(request, timeout=60) as response:
+                fetched = response.read()
+            break
+        except (TimeoutError, URLError):
+            if attempt == 3:
+                raise
+            time.sleep(5 * (attempt + 1))
+    if fetched is None:
+        raise RuntimeError("HTTPS CI evidence fetch returned no bytes")
     if fetched != rendered or hashlib.sha256(fetched).hexdigest() != hashlib.sha256(rendered).hexdigest():
         raise RuntimeError("HTTPS CI evidence bytes did not match the published bytes")
     fetched_object = json.loads(fetched.decode("utf-8"))
