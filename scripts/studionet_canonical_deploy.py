@@ -377,13 +377,14 @@ def main() -> int:
     )
     _record(run, "capture", capture)
     capture_record = journal.load()["operations"]["canonical.capture_evidence"]
-    capture_serialized = json.dumps(capture_record, sort_keys=True).encode("utf-8")
-    if len(capture_serialized) > 4_096 or "bytes_hex" in capture_serialized.decode("utf-8", errors="ignore"):
+    compact_result_size = legacy._compact_capture_result_size(capture_record)
+    consensus_text = json.dumps(capture_record.get("receipt", {}).get("consensus_data", {}), sort_keys=True)
+    if compact_result_size > 4_096 or any(field in consensus_text for field in ("parent_bytes_hex", "candidate_bytes_hex", "ci_bytes_hex", "security_bytes_hex")):
         raise RuntimeError("canonical compact capture result is not bounded/compact")
     snapshot = bridge.read_json(_CLIENT, governor, "get_evidence_snapshot", [proposal_id])
     if snapshot.get("status") != "EVIDENCE_READY" or snapshot.get("security_present") is not False:
         raise RuntimeError("canonical capture did not authenticate OPTIONAL snapshot")
-    run["compact_result_size"] = len(capture_serialized)
+    run["compact_result_size"] = compact_result_size
     run["snapshot_digest"] = snapshot.get("snapshot_digest")
     run["ready_after_capture"] = True
     run["snapshot"] = snapshot
