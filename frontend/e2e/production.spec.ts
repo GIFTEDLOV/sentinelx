@@ -30,7 +30,7 @@ async function auditRoute(page: Page, route: string): Promise<void> {
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("requestfailed", (request) => failedRequests.push(`${request.method()} ${request.url()} ${request.failure()?.errorText || "failed"}`));
   page.on("response", (response) => { if (response.status() >= 400) badResponses.push(`${response.status()} ${response.url()}`); });
-  if ((process.env.SENTINELX_BROWSER_BASE_URL || "").includes("localhost")) {
+  if (/localhost|127\.0\.0\.1/.test(process.env.SENTINELX_BROWSER_BASE_URL || "")) {
     await page.route("https://studio.genlayer.com/api", async (requestRoute) => {
       const payload = requestRoute.request().postDataJSON() as { method?: string } | null;
       await requestRoute.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: 1, result: payload?.method === "eth_chainId" ? "0xf22f" : "0x100" }) });
@@ -72,7 +72,7 @@ test.describe("SentinelX production browser routes", () => {
   });
 
   test("renders canonical verified release data in production", async ({ page }) => {
-    test.skip((process.env.SENTINELX_BROWSER_BASE_URL || "").includes("localhost"), "canonical chain assertion is production-only");
+    test.skip(/localhost|127\.0\.0\.1/.test(process.env.SENTINELX_BROWSER_BASE_URL || ""), "canonical chain assertion is production-only");
     await page.goto("/app/releases/1", { waitUntil: "domcontentloaded" });
     await expect(page.locator("body")).toContainText("VERIFIED", { timeout: 10_000 });
     const bodyText = await page.locator("body").innerText();
