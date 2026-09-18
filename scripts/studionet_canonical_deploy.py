@@ -209,7 +209,12 @@ def _proposal(client: Any, governor: str, proposal_id: int) -> dict[str, Any]:
 
 
 def _assert_address(value: Any, expected: str, label: str) -> None:
-    if str(value).lower().replace("addr#", "") != expected.lower():
+    actual = str(value).strip().lower()
+    if actual.startswith("addr#"):
+        actual = "0x" + actual[5:]
+    elif not actual.startswith("0x"):
+        actual = "0x" + actual
+    if actual != expected.lower():
         raise RuntimeError(f"{label} mismatch: {value} != {expected}")
 
 
