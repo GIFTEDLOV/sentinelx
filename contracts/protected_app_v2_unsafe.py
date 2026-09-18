@@ -51,7 +51,9 @@ class ProtectedApplication(gl.Contract):
     ):
         self.emergency_admin = gl.message.sender_address
         self.owner = gl.message.sender_address
-        self.sentinelx_governor = sentinelx_governor
+        # Stable py-genlayer delivers address calldata as text at the
+        # constructor boundary; normalize it before writing Address storage.
+        self.sentinelx_governor = Address(sentinelx_governor)
         self.application_name = application_name
         self.protected_value = initial_value
         self.value_nonce = 0

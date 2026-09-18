@@ -34,9 +34,9 @@ ORACLE = ROOT / "direct" / "sentinelx_v2_model.py"
 ORACLE_BASE = ROOT / "direct" / "sentinelx_model.py"
 FROZEN_HASHES = {
     GOVERNOR: "0983e4a4cd0d9212aa791421daebbd290f6ee12e654fc51c0a99f05bc52d5758",
-    ROOT / "contracts" / "protected_app_v1.py": "24fd37bbe034f120106aa36d354128c59f0de254070cb588a6d6845bdb33bc06",
-    ROOT / "contracts" / "protected_app_v2_safe.py": "96d85dbab185e1288813167f2989167afae03a439a6aadd375ffeff546bdef23",
-    ROOT / "contracts" / "protected_app_v2_unsafe.py": "822d9f23e2b719d5638def87186562ef9f01c79001003b10f15493ce5564306d",
+    ROOT / "contracts" / "protected_app_v1.py": "10677c073abd2b92084f9951fedc00806a9e45cae933c145131891563d3df7ac",
+    ROOT / "contracts" / "protected_app_v2_safe.py": "0f521440bb20f1dbe53841414c4bea15d57b9adcb02a70d84384c1cd77dc28ce",
+    ROOT / "contracts" / "protected_app_v2_unsafe.py": "708ac9a44c2c6ae9f26c16d17bd4e7630352a46dd40af72779afe968c8e91dcf",
 }
 
 TARGET_ADDRESS = "0x" + "1" * 40

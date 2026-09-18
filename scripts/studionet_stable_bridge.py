@@ -50,11 +50,25 @@ def _hash(value: Any) -> str:
 
 
 def _execution(receipt: dict[str, Any]) -> str:
-    return str(
+    direct = str(
         receipt.get("tx_execution_result_name")
         or receipt.get("execution_result")
         or ""
     )
+    if direct:
+        return direct
+    consensus = receipt.get("consensus_data")
+    leaders = consensus.get("leader_receipt") if isinstance(consensus, dict) else None
+    if isinstance(leaders, list):
+        for item in leaders:
+            if not isinstance(item, dict):
+                continue
+            result = str(item.get("execution_result") or "")
+            if result == "SUCCESS":
+                return "FINISHED_WITH_RETURN"
+            if result == "ERROR":
+                return "FINISHED_WITH_ERROR"
+    return ""
 
 
 def _status(receipt: dict[str, Any]) -> str:
