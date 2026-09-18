@@ -17,7 +17,7 @@ The canonical deployment is on Studionet, chain `61999`, at
 - Source revision: `cfb25215497adeb41357196caa8c755a685b4cf2`
 - Qualification head: `7dca629f7e413deaffad106a6ccad30164ac4ea7`
 - Canonical deployment artifact head: `55596ade32f3f76069b356d901a284e24c338d80`
-- Final hardening head: `80799d724fd265909ae8f192f2f3840a94a73bb8`
+- Final hardening head: `aa966437fc9fa5bea84901395b9e13048a8b4590`
 
 The exact source hashes and toolchain are in
 `deployments/studionet/v2.3/SOURCE_MANIFEST.json`. The canonical transaction

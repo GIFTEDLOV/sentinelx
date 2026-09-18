@@ -89,7 +89,7 @@
     "transaction_identity": "HASH",
     "wallet_wrong_network_write_guard": "PASS"
   },
-  "git_sha": "80799d724fd265909ae8f192f2f3840a94a73bb8",
+  "git_sha": "aa966437fc9fa5bea84901395b9e13048a8b4590",
   "historical_studio_dev": {
     "excluded_from_stable_profile": true,
     "new_writes": false,
@@ -104,7 +104,7 @@
   "phase": "CANONICAL_STUDIONET_RELEASE",
   "profile_addresses_remain_non_canonical": true,
   "provenance": {
-    "CANONICAL_DEPLOYED": "80799d724fd265909ae8f192f2f3840a94a73bb8",
+    "CANONICAL_DEPLOYED": "aa966437fc9fa5bea84901395b9e13048a8b4590",
     "PROFILED_NON_CANONICAL": {
       "governor": "0x178Cc14e39E5873C4EaB2590B1a94b92694545ac",
       "target": "0x9e0e22C8f35312E75C66f0255d4559f90e4fCd09"
