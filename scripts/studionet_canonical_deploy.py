@@ -280,16 +280,21 @@ def main() -> int:
     run["target"] = target
     _record(run, "target_deployment", target_result)
     run["target_source_parity"] = bridge.verify_source(_CLIENT, target, TARGET_SOURCE)
-    before = {
-        "owner": bridge.read(_CLIENT, target, "get_owner"),
-        "governor": bridge.read(_CLIENT, target, "get_upgrade_governor"),
-        "application_name": bridge.read(_CLIENT, target, "get_application_name"),
-        "value": bridge.read(_CLIENT, target, "get_protected_value"),
-        "nonce": bridge.read(_CLIENT, target, "get_value_nonce"),
-        "installed_proposal_id": bridge.read(_CLIENT, target, "get_installed_proposal_id"),
-        "installed_candidate_hash": bridge.read(_CLIENT, target, "get_installed_candidate_hash"),
-        "registered": bridge.read(_CLIENT, target, "is_registered_with_sentinelx"),
-    }
+    before = run.get("target_before")
+    if not isinstance(before, dict):
+        before = {
+            "owner": bridge.read(_CLIENT, target, "get_owner"),
+            "governor": bridge.read(_CLIENT, target, "get_upgrade_governor"),
+            "application_name": bridge.read(_CLIENT, target, "get_application_name"),
+            "value": bridge.read(_CLIENT, target, "get_protected_value"),
+            "nonce": bridge.read(_CLIENT, target, "get_value_nonce"),
+            "installed_proposal_id": bridge.read(_CLIENT, target, "get_installed_proposal_id"),
+            "installed_candidate_hash": bridge.read(_CLIENT, target, "get_installed_candidate_hash"),
+            "registered": bridge.read(_CLIENT, target, "is_registered_with_sentinelx"),
+        }
+    else:
+        if bridge.read(_CLIENT, target, "get_installed_proposal_id") != 0 or bridge.read(_CLIENT, target, "get_installed_candidate_hash") != "" or bridge.read(_CLIENT, target, "is_registered_with_sentinelx") is not False:
+            raise RuntimeError("canonical target changed installed/registration state during resume")
     _assert_address(before["owner"], EXPECTED_SIGNER, "canonical target owner")
     _assert_address(before["governor"], governor, "canonical target governor")
     if before["installed_proposal_id"] != 0 or before["installed_candidate_hash"] != "" or before["registered"] is not False:
