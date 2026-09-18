@@ -44,6 +44,7 @@
     "rpc": "https://studio.genlayer.com/api"
   },
   "phase": "STUDIONET_V23_STABLE_QUALIFICATION",
+  "result": "PASS",
   "safe_profile": {
     "compact_result_size": 827,
     "governor": "0x178Cc14e39E5873C4EaB2590B1a94b92694545ac",
@@ -94,9 +95,40 @@
   },
   "unsafe_profile": {
     "decision": "REJECTED",
+    "false_vector_fields": [
+      "behavioral_scope_matches_release",
+      "consensus_integrity_preserved",
+      "constitution_satisfied",
+      "evidence_trust_preserved",
+      "finality_safety_preserved",
+      "fund_flow_safe",
+      "liveness_preserved",
+      "migration_safety_preserved",
+      "no_privilege_escalation",
+      "public_interface_compatible",
+      "storage_layout_compatible",
+      "upgrade_authority_preserved",
+      "user_rights_preserved"
+    ],
     "installed": false,
     "negative_state_preserved": true,
     "proposal_id": 2,
+    "semantic_vector": {
+      "behavioral_scope_matches_release": false,
+      "consensus_integrity_preserved": false,
+      "constitution_satisfied": false,
+      "evidence_trust_preserved": false,
+      "external_fetch_surface_safe": true,
+      "finality_safety_preserved": false,
+      "fund_flow_safe": false,
+      "liveness_preserved": false,
+      "migration_safety_preserved": false,
+      "no_privilege_escalation": false,
+      "public_interface_compatible": false,
+      "storage_layout_compatible": false,
+      "upgrade_authority_preserved": false,
+      "user_rights_preserved": false
+    },
     "target": "0xD8F0Ce45738c86bA2C3D6c2595cFcc357Ae04920"
   }
 }

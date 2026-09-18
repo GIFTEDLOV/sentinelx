@@ -18,7 +18,7 @@ if (!privateKey) {
 
 const child = spawn(
   ".venv/Scripts/python.exe",
-  ["scripts/studionet_stable_profile.py"],
+  [process.env.SENTINELX_PYTHON_SCRIPT ?? "scripts/studionet_stable_profile.py"],
   {
     cwd: process.cwd(),
     env: {

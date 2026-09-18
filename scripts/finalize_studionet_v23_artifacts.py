@@ -41,6 +41,16 @@ def main() -> int:
     run_path.write_text(json.dumps(run, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     if isinstance(run.get("source_revision"), str) and run["source_revision"]:
         profile.SOURCE_REVISION = run["source_revision"]
+    readback_path = ROOT / "artifacts" / "studionet" / "v2.3" / "live-state-readback.json"
+    if readback_path.exists():
+        readback = json.loads(readback_path.read_text(encoding="utf-8"))
+        unsafe_proposal = readback.get("unsafe_proposal") or {}
+        unsafe_vector = unsafe_proposal.get("semantic_vector")
+        if isinstance(unsafe_vector, dict):
+            run["unsafe_semantic_vector"] = unsafe_vector
+            run["unsafe_false_vector_fields"] = sorted(
+                key for key, value in unsafe_vector.items() if value is False
+            )
 
     journal_obj = bridge.journal()
     outputs = profile._write_profile_outputs(
