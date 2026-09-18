@@ -16,7 +16,7 @@ export const PREVIEW_ONLY_FIXTURES = {
     security_prefix: "",
     security_attestation_mode: "OPTIONAL",
     current_version: "1.0.0",
-    current_source_url: "https://raw.githubusercontent.com/GIFTEDLOV/sentinelx/7e3b552c8b0471db0411206fdbc743dd12ef4e80/contracts/protected_app_v1.py",
+    current_source_url: "https://raw.githubusercontent.com/GIFTEDLOV/sentinelx/cfb25215497adeb41357196caa8c755a685b4cf2/contracts/protected_app_v1.py",
     current_code_hash: "sha256:preview-source",
     max_evidence_age_seconds: 604800,
     proposal_ttl_seconds: 86400,

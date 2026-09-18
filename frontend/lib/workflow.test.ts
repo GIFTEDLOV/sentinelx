@@ -5,7 +5,7 @@ import { SEMANTIC_FIELDS, type SemanticVector } from "./genlayer/types";
 import { deriveApproval, isProductionFixtureAllowed, isSuccessfulFinalized, mapEvidenceDisplay, pollingRecoveryAction, proposalPreconditions, proposalStatusLabel, sha256Hex, validateImmutableGitHubUrl } from "./workflow";
 
 const TRUE_VECTOR = Object.fromEntries(SEMANTIC_FIELDS.map((field) => [field, true])) as SemanticVector;
-const COMMIT = "7e3b552c8b0471db0411206fdbc743dd12ef4e80";
+const COMMIT = "cfb25215497adeb41357196caa8c755a685b4cf2";
 const RAW = `https://raw.githubusercontent.com/GIFTEDLOV/sentinelx/${COMMIT}/contracts/protected_app_v2_safe.py`;
 
 describe("SentinelX frontend safety workflow", () => {
