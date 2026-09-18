@@ -1,31 +1,26 @@
-# SentinelX toolchain
+# SentinelX stable toolchain
 
-SentinelX is pinned to the Studio-dev/v0.6 RC family. The selected published
-versions are:
+The canonical SentinelX V2.3 release uses the pinned stable compatibility
+family below:
 
 | Tool | Version |
 | --- | --- |
-| GenLayer CLI | `0.40.0-rc.3` |
-| GenLayerJS | `2.0.0-rc.1` (selected for Phase 2; frontend intentionally deferred) |
-| GenLayerPY | `0.19.0rc2` |
-| GLTest | `0.30.0rc2` |
+| GenLayerJS | `1.1.8` |
+| GenLayerPY | `0.18.0` |
+| GLTest | `0.29.2` |
 | GenVM static linter | `0.11.0` |
-| GenVM semantic linter | `0.11.1rc2` |
-| Semantic runner | `v0.6.0-rc5` |
+| GenVM runner | `v0.2.12` |
+| py-genlayer runner | `1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6` |
+| stdlib | `11rhn002yfajawsz7fai6mykznbxkxs6l91iskj5cm82c92qhy3v` |
 
-The canonical network is Studio-dev, RPC `https://studio-dev.genlayer.com/api`,
-chain ID `61997`. Studionet and other networks are out of scope.
+The canonical network is Studionet, RPC `https://studio.genlayer.com/api`,
+chain ID `61999`. Studio-dev 61997 is historical qualification evidence only.
 
-The version family was selected from the official [v0.6 migration
-guide](https://docs.genlayer.com/developers/consensus-v06-migration) and the
-[network configuration](https://docs.genlayer.com/developers/networks). The
-selected SDK/CLI versions are recorded in `requirements.txt` and
-`gltest.config.yaml`; JavaScript installation is deferred with the frontend.
+The selected SDK versions are recorded in `requirements.txt`,
+`gltest.config.yaml`, and `deployments/studionet/v2.3/SOURCE_MANIFEST.json`.
 
-The v0.6 write standard is represented in `scripts/fee_aware_transaction.py`:
-future callers must use a complete SDK estimate and carry its `distribution`
-and `feeValue` values unchanged. They broadcast exactly once, persist that
-transaction hash immediately, and prove finalized lifecycle, successful
-execution, and expected contract state before taking the next action. The
-static AST gate and semantic GenVM gate are intentionally separate; the exact
-semantic pairing is exercised by the V2 CI workflow.
+Canonical writes use the stable SDK-native fee model, current network policy,
+single-broadcast journaling, immediate hash persistence, and same-hash
+reconciliation. Every parent and internal child must reach `FINALIZED` plus
+`FINISHED_WITH_RETURN`. The static and semantic gates remain separate; the
+exact qualified results are recorded in the Studionet readiness manifest.

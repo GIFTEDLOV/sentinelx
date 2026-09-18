@@ -1,9 +1,9 @@
 # SentinelX V2 console
 
-The Phase 2B console is a Next.js App Router application for semantic release
-security on GenLayer Intelligent Contracts. It uses GenLayerJS `1.1.8`
-against Studionet (`61999`) and keeps the fee-aware, single-broadcast,
-same-hash reconciliation standard documented in `../docs/TOOLCHAIN.md`.
+The SentinelX console is a Next.js App Router application for semantic release
+security on GenLayer Intelligent Contracts. The canonical production app uses
+GenLayerJS `1.1.8` against Studionet (`61999`) and reads the verified
+canonical governor/target from production environment configuration.
 
 ## Local development
 
@@ -17,22 +17,20 @@ For isolated visual development only, set
 `NEXT_PUBLIC_SENTINELX_PREVIEW=true` in a development environment. Preview
 content is labelled and is not used by write adapters.
 
-Optional runtime configuration:
+Runtime configuration:
 
 ```text
 NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api
-NEXT_PUBLIC_SENTINELX_GOVERNOR_ADDRESS=
-NEXT_PUBLIC_SENTINELX_CANONICAL_TARGET_ADDRESS=
+NEXT_PUBLIC_SENTINELX_GOVERNOR_ADDRESS=0xb28b8E7F8930b4bd7Ed8572dA7e51AA4ca9D7cA8
+NEXT_PUBLIC_SENTINELX_CANONICAL_TARGET_ADDRESS=0xaF9ABA4DD9869d5F92EeA92c700E5f09A6978e21
+NEXT_PUBLIC_SENTINELX_PREVIEW=false
+NEXT_PUBLIC_SENTINELX_FEE_PROFILE_URL=<immutable raw GitHub URL>
 ```
 
-The address fields are intentionally empty until a real deployment exists.
-Write quoting does not require a fee profile. A matching measured entry is
-preferred; otherwise genlayer-js uses the live network-default quote, and an
-explicit development flag can select the concrete write simulation estimator.
-Gasless behavior is taken from the returned estimate, never inferred from the
-network name. Production policy may still require measured coverage for
-high-consequence operations.
+The production deployment uses the canonical addresses above; disposable
+profile addresses are never substituted. Write quoting does not require a fee
+profile, but the immutable qualified Studionet profile is configured for
+operator visibility.
 
-The historical V1 fee profile is preserved in `../artifacts/v1/` and is not
-served or used as a V2 production profile. A future V2 measured profile may be
-configured only after fresh V2 profiling.
+The historical V1 and disposable profile data are not served as production
+fixtures.
