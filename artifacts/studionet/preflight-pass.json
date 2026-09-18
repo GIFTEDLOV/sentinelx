@@ -5,6 +5,6 @@
   "result": "PASS",
   "rpc": "https://studio.genlayer.com/api",
   "schema": "sentinelx-studionet-preflight-v1",
-  "source_manifest_sha256": "7392fb84e7553d6e8c729dfa3733d1a429c239782fd061892e06afefd30487c5",
+  "source_manifest_sha256": "d839fea16231e1003a7675d8715b15671acf0e81314824140e8167fe475b26fa",
   "unresolved_journal_operations": []
 }
