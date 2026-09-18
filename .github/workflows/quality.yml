@@ -45,6 +45,16 @@ jobs:
             genvm-lint lint "$contract"
           done
 
+  secret-scan:
+    name: Tracked-file secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/secret_scan.py
+
   frontend:
     name: Frontend tests, typecheck, build and lint
     runs-on: ubuntu-latest
