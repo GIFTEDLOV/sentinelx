@@ -309,6 +309,7 @@ def _cleanup_cli_argument_files() -> None:
 def _run_cli(
     command: list[str], pattern: re.Pattern[str] | None = None,
     on_hash: Any | None = None,
+    on_output: Any | None = None,
 ) -> tuple[str | None, int]:
     """Run one CLI command and capture/persist the first labeled hash."""
     command = _cli_command(command)
@@ -329,6 +330,8 @@ def _run_cli(
         assert process.stdout is not None
         for line in process.stdout:
             clean = ANSI_RE.sub("", line)
+            if on_output is not None:
+                on_output(clean)
             if found is None:
                 managed_match = re.search(
                     r"SENTINELX_MANAGED_TRANSACTION_HASH[^0-9a-fA-F]*(0x[0-9a-fA-F]{64})",
@@ -800,13 +803,20 @@ def submit(
     # Only a labeled deployment/write hash is trusted; arbitrary 32-byte values
     # in fee reports, call keys, or error details are never transaction IDs.
     pattern = re.compile(r"(?:Deployment|Write)\s+Transaction\s+Hash[^0-9a-fA-F]*(0x[0-9a-fA-F]{64})", re.IGNORECASE)
+    cli_output: list[str] = []
     found, return_code = _run_cli(
         command,
         pattern,
         on_hash=lambda value: journal_obj.record_submission(operation, value),
+        on_output=lambda line: cli_output.append(line[-1000:]),
     )
     if found is None:
-        journal_obj.update(operation, state="BROADCAST_CALL_RAISED", cli_exit_code=return_code)
+        journal_obj.update(
+            operation,
+            state="BROADCAST_CALL_RAISED",
+            cli_exit_code=return_code,
+            cli_output_tail="".join(cli_output)[-4000:],
+        )
         raise RuntimeError(f"CLI {kind} broadcast returned no transaction hash; do not retry")
     if return_code != 0:
         journal_obj.update(operation, state="CLI_COMMAND_FAILED", cli_exit_code=return_code)
