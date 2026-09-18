@@ -1,7 +1,7 @@
 {
   "canonical_deployment_attempted": false,
   "chain_id": 61999,
-  "git_commit": "4ecaa22161ca6b9bb7dfb6f6b0fa652da03ca7a1",
+  "git_commit": "642a1307d4f3d08c9cac9c2ade43f51b2d3b0fdd",
   "historical_rc_revisions_preserved": [
     "V2",
     "V2.1",
