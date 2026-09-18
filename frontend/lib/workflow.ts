@@ -39,6 +39,25 @@ export function deriveApproval(vector: SemanticVector): boolean {
   return SEMANTIC_FIELDS.every((field) => vector[field] === true);
 }
 
+export const PROPOSAL_STATUS_LABELS: Record<string, string> = {
+  PROPOSED: "PROPOSED · UNASSESSED",
+  EVIDENCE_STAGED: "EVIDENCE STAGED",
+  EVIDENCE_READY: "EVIDENCE AUTHENTICATED",
+  EVIDENCE_REPAIR_REQUIRED: "EVIDENCE REPAIR REQUIRED",
+  EVIDENCE_RETRY_REQUIRED: "EVIDENCE RETRY REQUIRED",
+  REVIEW_RETRY_REQUIRED: "SEMANTIC REVIEW RETRY REQUIRED",
+  REJECTED: "REJECTED",
+  UPGRADE_QUEUED: "APPROVED · AWAITING INSTALL",
+  VERIFIED: "VERIFIED · INSTALLED",
+  EXPIRED: "EXPIRED",
+  CANCELLED: "CANCELLED",
+  EXECUTION_FAILED: "INSTALLATION FAILED",
+};
+
+export function proposalStatusLabel(status: string): string {
+  return PROPOSAL_STATUS_LABELS[status] || status.replaceAll("_", " ");
+}
+
 export function isSuccessfulFinalized(lifecycle: TransactionLifecycle, executionResult?: string): boolean {
   return lifecycle.state === "finalized" && executionResult === "FINISHED_WITH_RETURN";
 }

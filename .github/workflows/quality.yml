@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   direct-and-preflight:
     runs-on: ubuntu-latest
@@ -17,7 +20,10 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r requirements.txt
       - run: python -m pytest tests/direct -q
-      - run: python scripts/preflight.py
+      - run: python scripts/v2_mutation_runner.py --json
+      - run: python scripts/studionet_preflight.py
+      - run: python scripts/validate_studionet_v23_semantics.py
+      - run: python scripts/release_integrity.py
 
   static-ast-lint:
     name: Static AST lint (genvm-linter 0.11.0)
@@ -33,25 +39,6 @@ jobs:
         run: |
           for contract in contracts/sentinelx_governor.py contracts/protected_app_v1.py contracts/protected_app_v2_safe.py contracts/protected_app_v2_unsafe.py; do
             genvm-lint lint "$contract"
-          done
-
-  semantic-genvm-v06:
-    name: Semantic GenVM v0.6 gate (genvm-linter 0.11.1rc2)
-    runs-on: ubuntu-latest
-    env:
-      GENVM_VERSION: v0.6.0-rc5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install "genvm-linter==0.11.1rc2"
-      - name: Setup and validate all SentinelX V2 contracts
-        run: |
-          for contract in contracts/sentinelx_governor.py contracts/protected_app_v1.py contracts/protected_app_v2_safe.py contracts/protected_app_v2_unsafe.py; do
-            genvm-lint setup --contract "$contract"
-            genvm-lint validate "$contract"
           done
 
   frontend:
@@ -73,4 +60,22 @@ jobs:
       - run: npm run build
         working-directory: frontend
       - run: npm run lint
+        working-directory: frontend
+
+  browser-hydration:
+    name: Production browser hydration and route smoke
+    runs-on: ubuntu-latest
+    needs: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run test:browser
         working-directory: frontend

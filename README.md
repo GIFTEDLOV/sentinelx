@@ -51,3 +51,9 @@ python scripts/v2_mutation_runner.py
 The stable preflight is fail-closed and targets Studionet 61999. The historical
 V1 and disposable profile artifacts remain preserved and are not authoritative
 for the canonical release.
+
+The final frontend hardening record is
+[`docs/REVIEWER_HARDENING.md`](docs/REVIEWER_HARDENING.md). It documents the
+evidence-liveness, state-distinction, authority-binding, object-isolation, and
+finality-safe transaction invariants exercised by the repository and browser
+regression suites.

@@ -1,0 +1,25 @@
+{
+  "schema": "sentinelx-studionet-v23-release-provenance-v1",
+  "network": "Studionet",
+  "rpc": "https://studio.genlayer.com/api",
+  "chain_id": 61999,
+  "source_revision": "cfb25215497adeb41357196caa8c755a685b4cf2",
+  "qualification_head": "7dca629f7e413deaffad106a6ccad30164ac4ea7",
+  "canonical_deployment_artifact_head": "55596ade32f3f76069b356d901a284e24c338d80",
+  "final_hardening_head": "PENDING_FINAL_RELEASE_COMMIT",
+  "canonical_deployment": {
+    "status": "CANONICAL_DEPLOYED",
+    "governor": "0xb28b8E7F8930b4bd7Ed8572dA7e51AA4ca9D7cA8",
+    "target": "0xaF9ABA4DD9869d5F92EeA92c700E5f09A6978e21",
+    "proposal_id": 1,
+    "proposal_state": "VERIFIED",
+    "installed_safe_sha256": "1073b34f141b9dc5ba689ef3d98293fd628e30695dbd9092a9c6ecaba3d8c27d"
+  },
+  "profiled_non_canonical": {
+    "governor": "0x178Cc14e39E5873C4EaB2590B1a94b92694545ac",
+    "target": "0x9e0e22C8f35312E75C66f0255d4559f90e4fCd09"
+  },
+  "historical_studio_dev_preserved": true,
+  "canonical_contracts_redeployed_during_hardening": false,
+  "new_chain_writes_during_hardening": false
+}

@@ -1,6 +1,7 @@
 import type { CalldataEncodable, Hash as GenLayerHash } from "genlayer-js/types";
 import { TransactionStatus } from "genlayer-js/types";
-import { getGenLayerClient, getInjectedProvider } from "./client";
+import { getGenLayerClient, getInjectedProvider, getWalletChainId } from "./client";
+import { getSentinelXConfig, STUDIONET_CHAIN_ID } from "./chains";
 import { estimateWriteFees } from "./fees";
 import { getTransactionLifecycle } from "./reads";
 import { saveTransaction, updateTransaction } from "./transactions";
@@ -30,7 +31,7 @@ export async function trackTransaction(operation: string, hash: `0x${string}`): 
     const executionResult = receipt.txExecutionResultName;
     const successful = lifecycle.state === "finalized" && executionResult === "FINISHED_WITH_RETURN";
     const children = await client.getTriggeredTransactionIds({ hash: sdkHash(hash) });
-    const record = updateTransaction(operation, {
+    const record = updateTransaction(hash, {
       lifecycle,
       executionResult,
       childTransactionIds: children,
@@ -39,7 +40,7 @@ export async function trackTransaction(operation: string, hash: `0x${string}`): 
     if (!record) throw new Error("transaction was not persisted before tracking");
     return record;
   } catch (error) {
-    updateTransaction(operation, { verification: "ambiguous", lifecycle: { state: "unknown" } });
+    updateTransaction(hash, { verification: "ambiguous", lifecycle: { state: "unknown" } });
     throw new Error(`Polling failed for ${hash}; resume tracking the same hash. ${String(error)}`);
   }
 }
@@ -56,6 +57,8 @@ export async function writeContractOnce(args: {
 }): Promise<TransactionRecord> {
   const provider = getInjectedProvider();
   if (!provider) throw new Error("Connect a browser wallet before writing");
+  if (getSentinelXConfig().status !== "configured") throw new Error("Canonical Studionet configuration is unavailable");
+  if (await getWalletChainId(provider) !== STUDIONET_CHAIN_ID) throw new Error("Switch the wallet to Studionet before writing");
   const targetAddress = address(args.address);
   await estimateWriteFees({
     address: targetAddress,

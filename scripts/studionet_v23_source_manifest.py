@@ -15,6 +15,9 @@ SOURCES = {
     "safe": ROOT / "contracts" / "protected_app_v2_safe.py",
     "unsafe": ROOT / "contracts" / "protected_app_v2_unsafe.py",
 }
+SOURCE_REVISION = "cfb25215497adeb41357196caa8c755a685b4cf2"
+QUALIFICATION_HEAD = "7dca629f7e413deaffad106a6ccad30164ac4ea7"
+CANONICAL_DEPLOYMENT_ARTIFACT_HEAD = "55596ade32f3f76069b356d901a284e24c338d80"
 
 
 def sha256(path: Path) -> str:
@@ -25,9 +28,7 @@ def build_manifest(*, source_commit: str | None = None) -> dict[str, object]:
     return {
         "schema": "sentinelx-studionet-v23-source-manifest-v1",
         "release": "SentinelX V2.3 Studionet Stable",
-        "git_commit": source_commit or subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
-        ).strip(),
+        "git_commit": source_commit or SOURCE_REVISION,
         "network": "studionet",
         "rpc": "https://studio.genlayer.com/api",
         "chain_id": 61999,
@@ -51,7 +52,12 @@ def build_manifest(*, source_commit: str | None = None) -> dict[str, object]:
             },
         },
         "historical_revisions_preserved": ["V2", "V2.1", "V2.2 Studionet Stable", "V2.2 Studio-dev"],
-        "canonical_deployment_attempted": False,
+        "canonical_deployment_attempted": True,
+        "canonical_deployment_artifact_head": CANONICAL_DEPLOYMENT_ARTIFACT_HEAD,
+        "canonical_governor": "0xb28b8E7F8930b4bd7Ed8572dA7e51AA4ca9D7cA8",
+        "canonical_target": "0xaF9ABA4DD9869d5F92EeA92c700E5f09A6978e21",
+        "qualification_head": QUALIFICATION_HEAD,
+        "source_revision": SOURCE_REVISION,
     }
 
 

@@ -11,7 +11,7 @@ import { TransactionCenter } from "./transaction-center";
 import { WalletControl } from "./wallet-control";
 
 const PRIMARY = [["Overview", "/app", LayoutDashboard], ["Projects", "/app/projects", FolderKanban], ["Releases", "/app/releases/new", ShieldCheck], ["Activity", "/app/activity", Activity]] as const;
-const SECONDARY = [["Documentation", "https://github.com/GIFTEDLOV/sentinelx/tree/7e3b552c8b0471db0411206fdbc743dd12ef4e80/docs", FileText], ["Settings", "/app/settings", Settings2]] as const;
+const SECONDARY = [["Documentation", "https://github.com/GIFTEDLOV/sentinelx/tree/main/docs", FileText], ["Settings", "/app/settings", Settings2]] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname(); const [collapsed, setCollapsed] = useState(false); const [mobileOpen, setMobileOpen] = useState(false); const [commandOpen, setCommandOpen] = useState(false); const [txOpen, setTxOpen] = useState(false);

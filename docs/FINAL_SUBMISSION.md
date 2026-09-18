@@ -17,6 +17,7 @@ The canonical deployment is on Studionet, chain `61999`, at
 - Source revision: `cfb25215497adeb41357196caa8c755a685b4cf2`
 - Qualification head: `7dca629f7e413deaffad106a6ccad30164ac4ea7`
 - Canonical deployment artifact head: `55596ade32f3f76069b356d901a284e24c338d80`
+- Final hardening head: recorded in the final release commit and provenance manifest
 
 The exact source hashes and toolchain are in
 `deployments/studionet/v2.3/SOURCE_MANIFEST.json`. The canonical transaction
@@ -82,3 +83,12 @@ explicitly non-canonical.
 The full live proof, staged digest, snapshot digest, CI evidence commit, and
 readiness status are committed under `artifacts/studionet/v2.3/` and
 `deployments/studionet/v2.3/`.
+
+## Final hardening
+
+The production console hardening record is in
+[`docs/REVIEWER_HARDENING.md`](REVIEWER_HARDENING.md). It covers stable
+transaction snapshots, local error containment, finalized chain-state labels,
+evidence liveness and authority binding, proposal/target isolation, and
+finality-safe retry behavior. The production browser route suite exercises the
+canonical UI with fresh, valid, and corrupt local transaction storage.

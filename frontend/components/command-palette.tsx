@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const ITEMS = [
-  ["Overview", "/app", LayoutDashboard], ["Projects", "/app/projects", FolderKanban], ["New release", "/app/releases/new", ShieldCheck], ["Activity", "/app/activity", Command], ["Architecture", "https://github.com/GIFTEDLOV/sentinelx/blob/7e3b552c8b0471db0411206fdbc743dd12ef4e80/docs/ARCHITECTURE.md", FileCode2], ["Settings", "/app/settings", Settings2],
+  ["Overview", "/app", LayoutDashboard], ["Projects", "/app/projects", FolderKanban], ["New release", "/app/releases/new", ShieldCheck], ["Activity", "/app/activity", Command], ["Architecture", "https://github.com/GIFTEDLOV/sentinelx/blob/main/docs/ARCHITECTURE.md", FileCode2], ["Settings", "/app/settings", Settings2],
 ] as const;
 
 export function CommandPalette({ open, onOpen, onClose }: { open: boolean; onOpen: () => void; onClose: () => void }) {

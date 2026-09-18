@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, Inbox, ShieldAlert } from "lucide-react";
-import { shortHash } from "@/lib/workflow";
+import { proposalStatusLabel, shortHash } from "@/lib/workflow";
 
 export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description?: string; actions?: ReactNode }) {
   return <div className="page-header"><div><div className="section-kicker">{eyebrow}</div><h1>{title}</h1>{description && <p>{description}</p>}</div>{actions && <div className="page-actions">{actions}</div>}</div>;
@@ -16,8 +16,13 @@ export function StatCard({ label, value, note, tone }: { label: string; value: R
 }
 
 export function StatusBadge({ value, tone }: { value: string; tone?: "verified" | "waiting" | "rejected" | "neutral" | "info" | "pass" | "failed" | "missing" | "not-reviewed" | "unverified" | "successful" | "pending" }) {
-  const inferred = tone || (/(VERIFIED|PASS|SUCCESS|FINISHED)/i.test(value) ? "verified" : /(REJECT|FAIL|ERROR|MISSING)/i.test(value) ? "rejected" : /(WAIT|PROPOS|REVIEW|ACCEPT|PENDING|QUEUED)/i.test(value) ? "waiting" : "neutral");
-  return <span className={`status ${inferred}`}>{value.replaceAll("_", " ")}</span>;
+  const statusTones: Record<string, NonNullable<typeof tone>> = {
+    PROPOSED: "waiting", EVIDENCE_STAGED: "info", EVIDENCE_READY: "info",
+    EVIDENCE_REPAIR_REQUIRED: "rejected", EVIDENCE_RETRY_REQUIRED: "waiting", REVIEW_RETRY_REQUIRED: "waiting",
+    REJECTED: "rejected", UPGRADE_QUEUED: "waiting", VERIFIED: "verified", EXPIRED: "rejected", CANCELLED: "rejected", EXECUTION_FAILED: "failed",
+  };
+  const inferred = tone || statusTones[value] || (/(VERIFIED|PASS|SUCCESS|FINISHED)/i.test(value) ? "verified" : /(REJECT|FAIL|ERROR|MISSING)/i.test(value) ? "rejected" : /(WAIT|PROPOS|REVIEW|ACCEPT|PENDING|QUEUED)/i.test(value) ? "waiting" : "neutral");
+  return <span className={`status ${inferred}`}>{proposalStatusLabel(value)}</span>;
 }
 
 export function CopyText({ value, mono = true }: { value?: string; mono?: boolean }) {

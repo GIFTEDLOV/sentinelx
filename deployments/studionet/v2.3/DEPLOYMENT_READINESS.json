@@ -37,7 +37,7 @@
   "canonical_manifest": {
     "path": "deployments/studionet/v2.3/CANONICAL_DEPLOYMENT.json",
     "result": "PASS",
-    "sha256": "7e4ee1c1bdda7cfb8811d8dba7da804095789495a5c6983eb03eaf6ccc6051aa"
+    "sha256": "483e4b91161e88b2751d2f61a514e8e4d13d9d002b612988ef3489b61d14decf"
   },
   "fee_profile": {
     "coverage_path": "artifacts/studionet/v2.3/fee-profile-coverage.json",
@@ -46,6 +46,11 @@
   },
   "fee_profile_sha256": "9d50b9cc5fa0e6c66a32eebe9cc68c55f55662009e2f20f22ae6b80138f6776f",
   "gates": {
+    "browser_e2e": {
+      "count": 18,
+      "result": "PASS",
+      "scope": "canonical route hydration, corrupt/valid transaction storage, local mocked RPC only"
+    },
     "canonical_live_proof": "PASS",
     "canonical_safe_verified": "PASS",
     "canonical_unsafe_reference": "PASS",
@@ -57,7 +62,7 @@
     "frontend_build": "PASS",
     "frontend_lint": "PASS",
     "frontend_tests": {
-      "count": 17,
+      "count": 24,
       "result": "PASS"
     },
     "frontend_typecheck": "PASS",
@@ -72,6 +77,17 @@
     "semantic_validation": "PASS",
     "source_manifest": "PASS",
     "static_lint": "PASS"
+  },
+  "hardening": {
+    "app_error_boundary": "PASS",
+    "canonical_dashboard_reads": "PASS",
+    "canonical_frontend_config": "PASS",
+    "contract_source_changed": false,
+    "documentation_links": "PASS",
+    "reviewer_hardening_document": "docs/REVIEWER_HARDENING.md",
+    "transaction_store": "PASS",
+    "transaction_identity": "HASH",
+    "wallet_wrong_network_write_guard": "PASS"
   },
   "git_sha": "fa083181c84d66ea4831e234d365ab34fe95790b",
   "historical_studio_dev": {
@@ -135,7 +151,7 @@
     "target": "47bf21c12574ec8d43a41d79c987e1206b3c65b3e7f0e7998c8a3ff1179d2631",
     "unsafe": "380c80e653a2d87e02648eec57dbfd46f898fb1a4cccfbe349c027ffa9149340"
   },
-  "source_manifest_sha256": "6a4ec43dbc02fe4b1efbf7ed49cca261cb9f4a63a320a379c9b61b10222e529a",
+  "source_manifest_sha256": "7dffbb0e51366d2443f3f834b5a765c8629b8495796bfdb85fc22d50d9719f36",
   "source_revision": "cfb25215497adeb41357196caa8c755a685b4cf2",
   "status": "CANONICAL_DEPLOYED",
   "toolchain": {

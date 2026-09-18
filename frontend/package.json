@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@tanstack/react-query": "5.102.8",
@@ -22,6 +23,7 @@
     "sonner": "2.0.8"
   },
   "devDependencies": {
+    "@playwright/test": "1.55.0",
     "@types/node": "24.10.1",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",

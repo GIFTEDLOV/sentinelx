@@ -5,6 +5,14 @@ import { getSentinelXConfig, isAddress } from "./chains";
 import { GOVERNOR_METHODS, TARGET_METHODS } from "./contracts";
 import type { EvidenceSnapshot, ReleaseProposal, TargetPolicy, TransactionLifecycle } from "./types";
 
+export interface DashboardTargetRecord {
+  target: string;
+  policy?: TargetPolicy;
+  activeProposalId?: number;
+  history: Array<{ id: number; status?: string }>;
+  complete: boolean;
+}
+
 function requireAddress(address: string | undefined, label: string): `0x${string}` {
   if (!isAddress(address)) throw new Error(`${label} is not configured`);
   return address;
@@ -74,6 +82,36 @@ export async function getReleaseHistory(address: string): Promise<number[]> {
   const governor = requireAddress(getSentinelXConfig().governorAddress, "SentinelX governor address");
   const result = parseResult<unknown>(await read(governor, GOVERNOR_METHODS.releaseHistory, [requireAddress(address, "target address")]));
   return Array.isArray(result) ? result.map(Number) : [];
+}
+
+export async function getDashboardTargetRecords(): Promise<DashboardTargetRecord[]> {
+  const targets = await getTargetIds();
+  return Promise.all(targets.map(async (target) => {
+    let policy: TargetPolicy;
+    try {
+      policy = await getTargetPolicy(target);
+    } catch {
+      return { target, history: [], complete: false };
+    }
+    const [activeResult, historyResult] = await Promise.allSettled([
+      getActiveProposal(target),
+      getReleaseHistory(target),
+    ]);
+    const activeProposalId = activeResult.status === "fulfilled" ? activeResult.value : undefined;
+    const historyIds = historyResult.status === "fulfilled" ? historyResult.value : [];
+    const ids = [...new Set([...historyIds, ...(activeProposalId && activeProposalId > 0 ? [activeProposalId] : [])])];
+    const statuses = await Promise.all(ids.map(async (id) => {
+      try { return { id, status: await getProposalStatus(id) }; }
+      catch { return { id }; }
+    }));
+    return {
+      target,
+      policy,
+      activeProposalId,
+      history: statuses,
+      complete: activeResult.status === "fulfilled" && historyResult.status === "fulfilled" && statuses.every((entry) => entry.status),
+    };
+  }));
 }
 
 export async function getGovernorInfo(): Promise<unknown> {

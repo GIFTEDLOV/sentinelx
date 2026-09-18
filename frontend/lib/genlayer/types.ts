@@ -20,6 +20,7 @@ export type SemanticVector = Record<SemanticField, boolean | null>;
 
 export type ProposalStatus =
   | "PROPOSED"
+  | "EVIDENCE_STAGED"
   | "EVIDENCE_READY"
   | "EVIDENCE_REPAIR_REQUIRED"
   | "EVIDENCE_RETRY_REQUIRED"

@@ -4,6 +4,8 @@ import type { SentinelXConfig } from "./types";
 export const STUDIONET_RPC = "https://studio.genlayer.com/api";
 export const STUDIONET_CHAIN_ID = 61999;
 export const STUDIONET_NAME = "Studionet";
+export const CANONICAL_GOVERNOR = "0xb28b8E7F8930b4bd7Ed8572dA7e51AA4ca9D7cA8";
+export const CANONICAL_TARGET = "0xaF9ABA4DD9869d5F92EeA92c700E5f09A6978e21";
 
 export function getRpcUrl(): string {
   return process.env.NEXT_PUBLIC_GENLAYER_RPC_URL?.trim() || STUDIONET_RPC;
@@ -19,13 +21,16 @@ export function getSentinelXConfig(): SentinelXConfig {
   const rpcUrl = getRpcUrl();
   const addressesValid = (!governorAddress || isAddress(governorAddress)) &&
     (!canonicalTargetAddress || isAddress(canonicalTargetAddress));
+  const rpcValid = rpcUrl === STUDIONET_RPC;
+  const productionAddressesValid = process.env.NODE_ENV !== "production" ||
+    (governorAddress === CANONICAL_GOVERNOR && canonicalTargetAddress === CANONICAL_TARGET);
   return {
     rpcUrl,
     chainId: STUDIONET_CHAIN_ID,
     governorAddress: addressesValid ? governorAddress : undefined,
     canonicalTargetAddress: addressesValid ? canonicalTargetAddress : undefined,
     feeProfileUrl: process.env.NEXT_PUBLIC_SENTINELX_FEE_PROFILE_URL?.trim() || undefined,
-    status: addressesValid && governorAddress && canonicalTargetAddress ? "configured" : "unconfigured",
+    status: !rpcValid ? "wrong-network" : addressesValid && productionAddressesValid && governorAddress && canonicalTargetAddress ? "configured" : "unconfigured",
   };
 }
 

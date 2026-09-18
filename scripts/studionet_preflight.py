@@ -64,7 +64,10 @@ def main() -> int:
         "chain_id": CHAIN_ID,
         "source_manifest_sha256": _sha(ROOT / "deployments" / "studionet" / "v2.3" / "SOURCE_MANIFEST.json"),
         "unresolved_journal_operations": [],
-        "canonical_deployment_attempted": False,
+        "canonical_deployment_attempted": True,
+        "canonical_deployment_status": "CANONICAL_DEPLOYED",
+        "canonical_governor": "0xb28b8E7F8930b4bd7Ed8572dA7e51AA4ca9D7cA8",
+        "canonical_target": "0xaF9ABA4DD9869d5F92EeA92c700E5f09A6978e21",
     }
     OUTPUT.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps(result, sort_keys=True))

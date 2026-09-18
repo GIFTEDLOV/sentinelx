@@ -11,6 +11,8 @@ htmlcov/
 !.env.example
 node_modules/
 frontend/.next/
+frontend/test-results/
+frontend/playwright-report/
 frontend/node_modules/
 frontend/tsconfig.tsbuildinfo
 artifacts/*.json

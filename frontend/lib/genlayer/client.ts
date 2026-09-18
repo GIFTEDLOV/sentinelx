@@ -46,12 +46,12 @@ export async function getNetworkHealth(): Promise<{
       blockNumber: blockNumber.toString(),
       status: chainId === STUDIONET_CHAIN_ID ? "healthy" : "wrong-network",
     };
-  } catch {
+    } catch {
     return {
       name: STUDIONET_NAME,
       chainId: STUDIONET_CHAIN_ID,
       rpcUrl: getRpcUrl(),
-      blockNumber: "—",
+      blockNumber: "UNAVAILABLE",
       status: "unavailable",
     };
   }
