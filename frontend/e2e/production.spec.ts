@@ -74,9 +74,8 @@ test.describe("SentinelX production browser routes", () => {
   test("renders canonical verified release data in production", async ({ page }) => {
     test.skip((process.env.SENTINELX_BROWSER_BASE_URL || "").includes("localhost"), "canonical chain assertion is production-only");
     await page.goto("/app/releases/1", { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(1500);
+    await expect(page.locator("body")).toContainText("VERIFIED", { timeout: 10_000 });
     const bodyText = await page.locator("body").innerText();
-    expect(bodyText).toContain("VERIFIED");
     expect(bodyText).toContain("1073b34f14");
     expect(bodyText).toContain("0xaF9ABA4D");
     expect(bodyText).not.toContain("Something went wrong");
