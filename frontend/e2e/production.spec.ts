@@ -38,6 +38,11 @@ async function auditRoute(page: Page, route: string): Promise<void> {
   }
   await page.goto(route, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1500);
+  const bodyText = await page.locator("body").innerText();
+  expect(bodyText).not.toContain("0x178Cc14e39E5873C4EaB2590B1a94b92694545ac");
+  expect(bodyText).not.toContain("0x9e0e22C8f35312E75C66f0255d4559f90e4fCd09");
+  expect(bodyText).not.toContain("studio-dev");
+  expect(bodyText).not.toContain("61997");
   if (consoleErrors.length || pageErrors.length || failedRequests.length || badResponses.length) console.log(JSON.stringify({ route, consoleErrors, pageErrors, failedRequests, badResponses }, null, 2));
   await expect(page.locator("body")).not.toContainText("Something went wrong");
   await expect(page.locator("body")).toContainText("Studionet");
@@ -64,5 +69,16 @@ test.describe("SentinelX production browser routes", () => {
     ])));
     await auditRoute(page, "/app/activity");
     await expect(page.locator("body")).toContainText("review");
+  });
+
+  test("renders canonical verified release data in production", async ({ page }) => {
+    test.skip((process.env.SENTINELX_BROWSER_BASE_URL || "").includes("localhost"), "canonical chain assertion is production-only");
+    await page.goto("/app/releases/1", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1500);
+    const bodyText = await page.locator("body").innerText();
+    expect(bodyText).toContain("VERIFIED");
+    expect(bodyText).toContain("1073b34f14");
+    expect(bodyText).toContain("0xaF9ABA4D");
+    expect(bodyText).not.toContain("Something went wrong");
   });
 });
