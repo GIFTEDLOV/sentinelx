@@ -1,4 +1,4 @@
-"""Adversarial mutation suite for the SentinelX V2.2 boundary.
+"""Adversarial mutation suite for the SentinelX V2.3 Studionet boundary.
 
 Each mutation is applied to a temporary copy of the production contract and,
 where the deterministic V2 oracle can exercise the invariant, its temporary
@@ -33,10 +33,10 @@ TARGET = ROOT / "contracts" / "protected_app_v1.py"
 ORACLE = ROOT / "direct" / "sentinelx_v2_model.py"
 ORACLE_BASE = ROOT / "direct" / "sentinelx_model.py"
 FROZEN_HASHES = {
-    GOVERNOR: "7faa2d90563a00a5f64b09ee45ce82b5c8e3745b0bc25ced167a68d9a33108cb",
-    ROOT / "contracts" / "protected_app_v1.py": "61195c1442cf410923ad36de66d80390be731b2831a8ea57b6f5ff10a8bc21ea",
-    ROOT / "contracts" / "protected_app_v2_safe.py": "1676a239712f3709e52c5368f5fedd39e2f62266e2f1975f796cdda6932cb889",
-    ROOT / "contracts" / "protected_app_v2_unsafe.py": "92aca90838df29acdcb6915f56ef836de634673a5d14546aa8d22a90902f0fb7",
+    GOVERNOR: "1c53c221300a5fd4e901a3608c72f87c88ed14136f5a95f786a2854355270423",
+    ROOT / "contracts" / "protected_app_v1.py": "47bf21c12574ec8d43a41d79c987e1206b3c65b3e7f0e7998c8a3ff1179d2631",
+    ROOT / "contracts" / "protected_app_v2_safe.py": "1073b34f141b9dc5ba689ef3d98293fd628e30695dbd9092a9c6ecaba3d8c27d",
+    ROOT / "contracts" / "protected_app_v2_unsafe.py": "380c80e653a2d87e02648eec57dbfd46f898fb1a4cccfbe349c027ffa9149340",
 }
 
 TARGET_ADDRESS = "0x" + "1" * 40
@@ -819,8 +819,35 @@ def gate_validator(functions: dict[str, str]) -> None:
 
 def gate_install_finality(functions: dict[str, str]) -> None:
     body = functions["confirm_install"]
-    assert "get_installed_proposal_id() != proposal_id" in body
-    assert "get_installed_candidate_hash() != proposal.candidate_code_hash" in body
+    assert "gl.message.sender_address != proposal.target" in body
+    assert "policy.policy_fingerprint != proposal.policy_fingerprint" in body
+    assert "policy.current_code_hash != proposal.parent_code_hash" in body
+    assert "active_proposal_by_target" in body
+    assert "LATEST_FINALIZED" not in body
+
+
+def gate_confirm_sender(functions: dict[str, str]) -> None:
+    assert "gl.message.sender_address != proposal.target" in functions["confirm_install"]
+
+
+def gate_confirm_policy(functions: dict[str, str]) -> None:
+    assert "policy.policy_fingerprint != proposal.policy_fingerprint" in functions["confirm_install"]
+
+
+def gate_confirm_parent(functions: dict[str, str]) -> None:
+    assert "policy.current_code_hash != proposal.parent_code_hash" in functions["confirm_install"]
+
+
+def gate_confirm_active(functions: dict[str, str]) -> None:
+    assert "active_proposal_by_target" in functions["confirm_install"]
+
+
+def gate_retry_proposal(functions: dict[str, str]) -> None:
+    assert "self.installed_proposal_id != proposal_id" in functions["retry_install_confirmation"]
+
+
+def gate_retry_hash(functions: dict[str, str]) -> None:
+    assert "not self.installed_candidate_hash" in functions["retry_install_confirmation"]
 
 
 def gate_target_governor(functions: dict[str, str]) -> None:
@@ -1051,9 +1078,9 @@ def _mutations() -> tuple[Mutation, ...]:
             '            validator_result = self._independent_snapshot_review(\n                proposal_memory, policy_memory, snapshot_memory, now\n            )\n            return self._same_review_result(returned.calldata, validator_result)\n',
             '            return True\n', "validator recomputation"),
             _source('        if leader != validator:\n', '        if False:\n', "validator recomputation oracle"), probe_validator_recompute, gate_validator),
-        Mutation(22, "allow install before finalized authorization", governor, _source(
-            '        if target_view.get_installed_proposal_id() != proposal_id:\n            raise gl.vm.UserError("Target installation is not finalized")\n        if target_view.get_installed_candidate_hash() != proposal.candidate_code_hash:\n            raise gl.vm.UserError("Finalized target hash does not match candidate")\n',
-            '        if False:\n            raise gl.vm.UserError("Target installation is not finalized")\n', "install finality"), no_model, None, gate_install_finality),
+        Mutation(22, "remove exact protected-target confirmation sender", governor, _source(
+            '        if gl.message.sender_address != proposal.target:\n            raise gl.vm.UserError("Only the protected target may confirm installation")\n',
+            '        if False:\n            raise gl.vm.UserError("Only the protected target may confirm installation")\n', "confirmation sender"), no_model, None, gate_confirm_sender),
         Mutation(23, "remove governor-only install authorization", target, _source(
             '        if gl.message.sender_address != self.sentinelx_governor:\n            raise gl.vm.UserError("Only SentinelX may install an upgrade")\n',
             '        if False:\n            raise gl.vm.UserError("Only SentinelX may install an upgrade")\n', "target governor authority"), no_model, None, gate_target_governor),
@@ -1220,6 +1247,31 @@ def _mutations() -> tuple[Mutation, ...]:
             '        if False:\n            raise SentinelXError("Install authorization is absent")\n',
             "separate install execution oracle"), probe_execute_before_review,
             gate_separate_install_execution),
+        Mutation(51, "remove confirmation policy-fingerprint binding", governor, _source_in_function(
+            "confirm_install",
+            '        if policy.policy_fingerprint != proposal.policy_fingerprint:\n            raise gl.vm.UserError("Proposal policy fingerprint no longer matches")\n',
+            '        if False:\n            raise gl.vm.UserError("Proposal policy fingerprint no longer matches")\n',
+            "confirmation policy fingerprint"), no_model, None, gate_confirm_policy),
+        Mutation(52, "remove confirmation parent-policy binding", governor, _source_in_function(
+            "confirm_install",
+            '        if policy.current_code_hash != proposal.parent_code_hash:\n            raise gl.vm.UserError("Proposal parent is no longer current")\n',
+            '        if False:\n            raise gl.vm.UserError("Proposal parent is no longer current")\n',
+            "confirmation parent policy"), no_model, None, gate_confirm_parent),
+        Mutation(53, "remove confirmation active-proposal binding", governor, _source_in_function(
+            "confirm_install",
+            '        if self.active_proposal_by_target.get(proposal.target, self._empty_proposal()) != proposal_id:\n            raise gl.vm.UserError("Proposal is not the active target authorization")\n',
+            '        if False:\n            raise gl.vm.UserError("Proposal is not the active target authorization")\n',
+            "confirmation active proposal"), no_model, None, gate_confirm_active),
+        Mutation(54, "allow retry for a proposal other than local installed proposal", target, _source_in_function(
+            "retry_install_confirmation",
+            '        if self.installed_proposal_id != proposal_id:\n            raise gl.vm.UserError("Requested proposal is not installed")\n',
+            '        if False:\n            raise gl.vm.UserError("Requested proposal is not installed")\n',
+            "retry proposal binding"), no_model, None, gate_retry_proposal),
+        Mutation(55, "allow retry without a locally stored candidate hash", target, _source_in_function(
+            "retry_install_confirmation",
+            '        if not self.installed_candidate_hash:\n            raise gl.vm.UserError("Installed candidate hash is missing")\n',
+            '        if False:\n            raise gl.vm.UserError("Installed candidate hash is missing")\n',
+            "retry hash binding"), no_model, None, gate_retry_hash),
     )
 
 
@@ -1227,7 +1279,7 @@ def _verify_frozen_sources() -> None:
     for path, expected in FROZEN_HASHES.items():
         actual = hashlib.sha256(path.read_bytes()).hexdigest()
         if actual != expected:
-            raise RuntimeError(f"frozen V2 source changed unexpectedly: {path} ({actual})")
+            raise RuntimeError(f"frozen V2.3 source changed unexpectedly: {path} ({actual})")
 
 
 def run() -> dict[str, Any]:

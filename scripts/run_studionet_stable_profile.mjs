@@ -24,7 +24,7 @@ const child = spawn(
     env: {
       ...process.env,
       SENTINELX_EPHEMERAL_PRIVATE_KEY: privateKey,
-      SENTINELX_STUDIONET_PROFILE_STATE: process.env.SENTINELX_STUDIONET_PROFILE_STATE ?? "studionet-stable-profile-r1",
+      SENTINELX_STUDIONET_PROFILE_STATE: process.env.SENTINELX_STUDIONET_PROFILE_STATE ?? "studionet-v23-profile-r1",
     },
     stdio: "inherit",
     windowsHide: true,

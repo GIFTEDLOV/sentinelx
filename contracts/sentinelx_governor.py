@@ -3,19 +3,13 @@
 from genlayer import Address, DynArray, TreeMap, allow_storage, gl, u64, u256
 from dataclasses import dataclass
 from datetime import datetime
-from genlayer.py.public_abi import StorageType
-
-
-class StorageView:
-    LATEST_FINALIZED = StorageType.LATEST_FINAL
-    LATEST_DECIDED = StorageType.LATEST_NON_FINAL
 import hashlib
 import json
 import re
 import typing
 
 
-SCHEMA_VERSION = "sentinelx-governor-v2"
+SCHEMA_VERSION = "sentinelx-governor-v2.3-studionet"
 EVIDENCE_SCHEMA = "sentinelx-evidence-v1"
 STAGED_EVIDENCE_SCHEMA = "sentinelx-staged-evidence-v2"
 SNAPSHOT_SCHEMA = "sentinelx-evidence-snapshot-v3"
@@ -1919,6 +1913,15 @@ class SentinelXGovernor(gl.Contract):
 
     @gl.public.write
     def confirm_install(self, proposal_id: u256, candidate_hash: str) -> None:
+        """Record a target-originated installation confirmation.
+
+        The install child is emitted with ``on=\"finalized\"`` by the target
+        only after the target installation transaction has finalized.  The
+        confirmation therefore authenticates the exact target sender and the
+        frozen governor authorization; it deliberately does not perform a
+        second cross-contract historical-state read, which is unavailable on
+        the hosted Studionet runtime.
+        """
         proposal = self._require_proposal(proposal_id)
         if gl.message.sender_address != proposal.target:
             raise gl.vm.UserError("Only the protected target may confirm installation")
@@ -1928,58 +1931,35 @@ class SentinelXGovernor(gl.Contract):
             return
         if proposal.status != STATUS_UPGRADE_QUEUED or candidate_hash != proposal.candidate_code_hash:
             raise gl.vm.UserError("Install confirmation does not match authorization")
-        target_view = SentinelXTargetInterface(proposal.target).view(state=StorageView.LATEST_FINALIZED)
-        if target_view.get_installed_proposal_id() != proposal_id:
-            raise gl.vm.UserError("Target installation is not finalized")
-        if target_view.get_installed_candidate_hash() != proposal.candidate_code_hash:
-            raise gl.vm.UserError("Finalized target hash does not match candidate")
+        policy = self._require_policy(proposal.target)
+        if policy.policy_fingerprint != proposal.policy_fingerprint:
+            raise gl.vm.UserError("Proposal policy fingerprint no longer matches")
+        if policy.current_code_hash != proposal.parent_code_hash:
+            raise gl.vm.UserError("Proposal parent is no longer current")
+        if self._now() > int(proposal.execution_deadline):
+            raise gl.vm.UserError("Upgrade authorization has expired")
+        if self.active_proposal_by_target.get(proposal.target, self._empty_proposal()) != proposal_id:
+            raise gl.vm.UserError("Proposal is not the active target authorization")
         self._record_verified(proposal, "INSTALL_CONFIRMED")
 
     @gl.public.write
     def reconcile_install(self, proposal_id: u256) -> None:
+        """Historical compatibility entry point, unsupported on Studionet.
+
+        V2.2 used a governor-originated LATEST_FINALIZED target read here.
+        The hosted stable runtime cannot execute that selector reliably.  V2.3
+        recovery is target-originated through ``retry_install_confirmation``.
+        Keeping this method as an explicit failure prevents an owner from
+        mistaking an unsupported historical path for an attestation.
+        """
         proposal = self._require_proposal(proposal_id)
         self._require_owner(proposal.target)
-        if proposal.status != STATUS_UPGRADE_QUEUED:
-            raise gl.vm.UserError("Proposal is not awaiting installation")
-        target_view = SentinelXTargetInterface(proposal.target).view(state=StorageView.LATEST_FINALIZED)
-        if target_view.get_installed_proposal_id() != proposal_id:
-            raise gl.vm.UserError("Finalized target attestation is absent")
-        if target_view.get_installed_candidate_hash() != proposal.candidate_code_hash:
-            raise gl.vm.UserError("Finalized target hash does not match candidate")
-        self._record_verified(proposal, "INSTALL_RECONCILED")
+        raise gl.vm.UserError("Historical reconcile_install is unsupported; use target confirmation retry")
 
     @gl.public.write
     def mark_execution_timeout(self, proposal_id: u256) -> None:
-        proposal = self._require_proposal(proposal_id)
-        policy = self._require_owner(proposal.target)
-        if proposal.status != STATUS_UPGRADE_QUEUED:
-            raise gl.vm.UserError("Proposal is not awaiting installation")
-        if self._now() <= int(proposal.execution_deadline):
-            raise gl.vm.UserError("Execution deadline has not passed")
-        target = SentinelXTargetInterface(proposal.target)
-        finalized_view = target.view(state=StorageView.LATEST_FINALIZED)
-        if (
-            finalized_view.get_installed_proposal_id() == proposal_id
-            and finalized_view.get_installed_candidate_hash() == proposal.candidate_code_hash
-        ):
-            self._record_verified(proposal, "INSTALL_RECONCILED_TIMEOUT")
-            return
-        # If a non-finalized child reports the candidate, leave the active
-        # proposal locked. An ambiguous child must never become authorization.
-        nonfinal_view = target.view(state=StorageView.LATEST_DECIDED)
-        if (
-            nonfinal_view.get_installed_proposal_id() == proposal_id
-            and nonfinal_view.get_installed_candidate_hash() == proposal.candidate_code_hash
-        ):
-            raise gl.vm.UserError("Installation is pending finality")
-        if (
-            finalized_view.get_installed_proposal_id() != self._empty_proposal()
-            or finalized_view.get_installed_candidate_hash() != policy.current_code_hash
-        ):
-            raise gl.vm.UserError("Finalized installation state is inconsistent")
-        proposal.status = STATUS_EXECUTION_FAILED
-        proposal.last_review_code = "EXECUTION_TIMEOUT"
-        self._release_active(proposal.target, proposal_id)
+        self._require_proposal(proposal_id)
+        raise gl.vm.UserError("Historical timeout reconciliation is unsupported; use target confirmation retry")
 
     # ------------------------------------------------------------------
     # Bounded reviewer-facing views

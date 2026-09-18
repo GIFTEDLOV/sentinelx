@@ -15,8 +15,8 @@ if str(Path(__file__).resolve().parents[1]) not in sys.path:
 ROOT = Path(__file__).resolve().parents[1]
 RPC = "https://studio.genlayer.com/api"
 CHAIN_ID = 61999
-JOURNAL = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "SentinelX" / "studionet-stable-profile-r1" / "transactions.json"
-OUTPUT = ROOT / "artifacts" / "studionet" / "preflight-pass.json"
+JOURNAL = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "SentinelX" / "studionet-v23-profile-r1" / "transactions.json"
+OUTPUT = ROOT / "artifacts" / "studionet" / "v2.3" / "preflight-pass.json"
 
 
 def _sha(path: Path) -> str:
@@ -41,7 +41,7 @@ def main() -> int:
     for required in ("genlayer-py==0.18.0", "genlayer-test==0.29.2"):
         if required not in requirements:
             errors.append(f"missing stable dependency pin: {required}")
-    from scripts.studionet_source_manifest import verify_manifest
+    from scripts.studionet_v23_source_manifest import verify_manifest
     errors.extend(verify_manifest())
     unresolved: list[str] = []
     if JOURNAL.exists():
@@ -62,7 +62,7 @@ def main() -> int:
         "network": "Studionet",
         "rpc": RPC,
         "chain_id": CHAIN_ID,
-        "source_manifest_sha256": _sha(ROOT / "deployments" / "studionet" / "SOURCE_MANIFEST.json"),
+        "source_manifest_sha256": _sha(ROOT / "deployments" / "studionet" / "v2.3" / "SOURCE_MANIFEST.json"),
         "unresolved_journal_operations": [],
         "canonical_deployment_attempted": False,
     }

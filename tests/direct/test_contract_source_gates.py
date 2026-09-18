@@ -76,12 +76,33 @@ def test_target_upgrade_path_checks_governor_sender_and_live_authorization():
 
 def test_v2_governor_declares_bounded_attestation_modes_and_snapshot_schema():
     text = (CONTRACT_DIR / "sentinelx_governor.py").read_text(encoding="utf-8")
-    assert 'SCHEMA_VERSION = "sentinelx-governor-v2"' in text
+    assert 'SCHEMA_VERSION = "sentinelx-governor-v2.3-studionet"' in text
     assert 'STAGED_EVIDENCE_SCHEMA = "sentinelx-staged-evidence-v2"' in text
     assert 'SNAPSHOT_SCHEMA = "sentinelx-evidence-snapshot-v3"' in text
     assert 'SECURITY_OPTIONAL = "OPTIONAL"' in text
     assert 'SECURITY_REQUIRED_INDEPENDENT = "REQUIRED_INDEPENDENT"' in text
     assert 'STATUS_EVIDENCE_READY = "EVIDENCE_READY"' in text
+
+
+def test_v23_confirmation_is_sender_and_authorization_bound_without_historical_view_reads():
+    module = parsed("sentinelx_governor.py")
+    functions = {
+        node.name: node for node in ast.walk(module)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    confirm = ast.unparse(functions["confirm_install"])
+    reconcile = ast.unparse(functions["reconcile_install"])
+    assert "gl.message.sender_address != proposal.target" in confirm
+    assert "policy.policy_fingerprint != proposal.policy_fingerprint" in confirm
+    assert "policy.current_code_hash != proposal.parent_code_hash" in confirm
+    assert "active_proposal_by_target" in confirm
+    assert "LATEST_FINALIZED" not in confirm
+    assert "LATEST_DECIDED" not in confirm
+    assert "unsupported" in reconcile.lower()
+    for name in ("protected_app_v1.py", "protected_app_v2_safe.py"):
+        target = (CONTRACT_DIR / name).read_text(encoding="utf-8")
+        assert "def retry_install_confirmation" in target
+        assert "self.installed_candidate_hash" in target
 
 
 def test_v2_policy_and_snapshot_storage_are_explicitly_bound():

@@ -4,7 +4,7 @@ from genlayer import Address, gl, u256
 import hashlib
 
 
-TARGET_SCHEMA_VERSION = "sentinelx-target-v2"
+TARGET_SCHEMA_VERSION = "sentinelx-target-v2.3-studionet"
 
 
 @gl.contract_interface
@@ -115,3 +115,21 @@ class ProtectedApplication(gl.Contract):
     @gl.public.view
     def get_installed_candidate_hash(self) -> str:
         return self.installed_candidate_hash
+
+    @gl.public.write
+    def retry_install_confirmation(self, proposal_id: u256) -> None:
+        """Compatibility surface for the rejected candidate only.
+
+        An unsafe candidate is never authorized by SentinelX, so this method
+        is not reachable in a qualified release.  It still enforces the same
+        local-state-only retry rule as the safe target.
+        """
+        if gl.message.sender_address != self.owner:
+            raise gl.vm.UserError("Only owner")
+        if self.installed_proposal_id != proposal_id:
+            raise gl.vm.UserError("Requested proposal is not installed")
+        if not self.installed_candidate_hash:
+            raise gl.vm.UserError("Installed candidate hash is missing")
+        SentinelXGovernorInterface(self.sentinelx_governor).emit(on="finalized").confirm_install(
+            self.installed_proposal_id, self.installed_candidate_hash
+        )

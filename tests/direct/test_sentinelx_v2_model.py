@@ -17,6 +17,7 @@ from direct.sentinelx_v2_model import (
     REPAIR,
     REQUIRED_INDEPENDENT,
     RETRY,
+    VERIFIED,
     COMPACT_CAPTURE_MAX_TEST_SIZE,
     SentinelXV2Model,
     SentinelXV2TargetModel,
@@ -592,6 +593,69 @@ def test_safe_candidate_installation_semantics_remain_finality_gated():
     model.review(proposal.proposal_id, semantic=all_true(), caller=OWNER)
     model.confirm_install(proposal.proposal_id)
     assert proposal.status == "VERIFIED"
+
+
+def test_eoa_cannot_call_confirm_install():
+    model, proposal = prepared()
+    model.capture_evidence(proposal.proposal_id, web=web_for(proposal), caller=OWNER)
+    model.review(proposal.proposal_id, semantic=all_true(), caller=OWNER)
+    with pytest.raises(SentinelXError, match="protected target"):
+        model.confirm_install(proposal.proposal_id, sender=OWNER)
+    assert proposal.status == QUEUED
+
+
+def test_wrong_target_cannot_confirm_install():
+    model, proposal = prepared()
+    model.capture_evidence(proposal.proposal_id, web=web_for(proposal), caller=OWNER)
+    model.review(proposal.proposal_id, semantic=all_true(), caller=OWNER)
+    with pytest.raises(SentinelXError, match="protected target"):
+        model.confirm_install(proposal.proposal_id, sender="0x" + "b" * 40)
+
+
+def test_target_cannot_confirm_wrong_hash_or_inactive_proposal():
+    model, proposal = prepared()
+    model.capture_evidence(proposal.proposal_id, web=web_for(proposal), caller=OWNER)
+    model.review(proposal.proposal_id, semantic=all_true(), caller=OWNER)
+    with pytest.raises(SentinelXError, match="does not match"):
+        model.confirm_install(proposal.proposal_id, candidate_hash="0" * 64)
+    model.active[TARGET] = 0
+    with pytest.raises(SentinelXError, match="active"):
+        model.confirm_install(proposal.proposal_id)
+
+
+def test_target_originated_retry_requires_local_installed_state_and_is_exact():
+    model, proposal = prepared()
+    model.capture_evidence(proposal.proposal_id, web=web_for(proposal), caller=OWNER)
+    model.review(proposal.proposal_id, semantic=all_true(), caller=OWNER)
+    target = SentinelXV2TargetModel(model, TARGET, OWNER)
+    with pytest.raises(SentinelXError, match="not installed"):
+        target.retry_install_confirmation(proposal.proposal_id, caller=OWNER)
+    target.install_reviewed_upgrade(proposal.proposal_id)
+    target.retry_install_confirmation(proposal.proposal_id, caller=OWNER)
+    assert proposal.status == VERIFIED
+    assert model.release_history[TARGET] == [proposal.proposal_id]
+
+
+def test_owner_cannot_forge_target_confirmation_or_retry_hash():
+    model, proposal = prepared()
+    model.capture_evidence(proposal.proposal_id, web=web_for(proposal), caller=OWNER)
+    model.review(proposal.proposal_id, semantic=all_true(), caller=OWNER)
+    target = SentinelXV2TargetModel(model, TARGET, OWNER)
+    target.installed_proposal_id = proposal.proposal_id
+    target.installed_candidate_hash = "0" * 64
+    with pytest.raises(SentinelXError, match="does not match"):
+        target.retry_install_confirmation(proposal.proposal_id, caller=OWNER)
+
+
+def test_matching_late_confirmation_is_idempotent_and_conflict_is_rejected():
+    model, proposal = prepared()
+    model.capture_evidence(proposal.proposal_id, web=web_for(proposal), caller=OWNER)
+    model.review(proposal.proposal_id, semantic=all_true(), caller=OWNER)
+    model.confirm_install(proposal.proposal_id)
+    model.confirm_install(proposal.proposal_id, sender=TARGET, candidate_hash=proposal.candidate_code_hash)
+    assert model.release_history[TARGET] == [proposal.proposal_id]
+    with pytest.raises(SentinelXError, match="Conflicting"):
+        model.confirm_install(proposal.proposal_id, sender=TARGET, candidate_hash="0" * 64)
 
 
 def test_timeout_releases_authorization_without_rebroadcast():

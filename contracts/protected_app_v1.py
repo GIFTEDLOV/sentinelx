@@ -4,7 +4,7 @@ from genlayer import Address, gl, u256
 import hashlib
 
 
-TARGET_SCHEMA_VERSION = "sentinelx-target-v2"
+TARGET_SCHEMA_VERSION = "sentinelx-target-v2.3-studionet"
 
 
 @gl.contract_interface
@@ -209,3 +209,20 @@ class ProtectedApplication(gl.Contract):
         code.extend(candidate_code)
 
         governor.emit(on="finalized").confirm_install(proposal_id, actual_hash)
+
+    @gl.public.write
+    def retry_install_confirmation(self, proposal_id: u256) -> None:
+        """Retry confirmation from the target's own installed state.
+
+        This recovery path never accepts an owner-supplied hash.  The owner
+        can only request a confirmation for the exact proposal and candidate
+        hash already written by ``install_reviewed_upgrade``.
+        """
+        self._only_owner()
+        if self.installed_proposal_id != proposal_id:
+            raise gl.vm.UserError("Requested proposal is not installed")
+        if not self.installed_candidate_hash:
+            raise gl.vm.UserError("Installed candidate hash is missing")
+        SentinelXGovernorInterface(self.sentinelx_governor).emit(on="finalized").confirm_install(
+            self.installed_proposal_id, self.installed_candidate_hash
+        )

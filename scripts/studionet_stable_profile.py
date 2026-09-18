@@ -1,4 +1,4 @@
-"""Run the full SentinelX V2.2 disposable profile on stable Studionet.
+"""Run the full SentinelX V2.3 disposable profile on stable Studionet.
 
 The proven V2.2 workflow is reused only as orchestration.  Its historical
 Studio-dev bridge is replaced in-process with the stable genlayer-py 0.18
@@ -23,10 +23,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-os.environ.setdefault("SENTINELX_PROFILE_STATE", "studionet-stable-profile-r1")
-os.environ.setdefault("SENTINELX_STUDIONET_PROFILE_STATE", "studionet-stable-profile-r1")
+os.environ.setdefault("SENTINELX_PROFILE_STATE", "studionet-v23-profile-r1")
+os.environ.setdefault("SENTINELX_STUDIONET_PROFILE_STATE", "studionet-v23-profile-r1")
 
-from scripts import studionet_source_manifest as stable_manifest  # noqa: E402
+from scripts import studionet_v23_source_manifest as stable_manifest  # noqa: E402
 from scripts import studionet_stable_bridge as stable_bridge  # noqa: E402
 
 GOVERNOR_SOURCE = ROOT / "contracts" / "sentinelx_governor.py"
@@ -39,19 +39,19 @@ SOURCE_PREFIX = "https://raw.githubusercontent.com/GIFTEDLOV/sentinelx/"
 CI_PREFIX = "https://raw.githubusercontent.com/GIFTEDLOV/sentinelx-ci/"
 CI_REPOSITORY = "https://github.com/GIFTEDLOV/sentinelx-ci.git"
 CI_ISSUER = "GIFTEDLOV/sentinelx-ci"
-GOVERNOR_HASH = "7faa2d90563a00a5f64b09ee45ce82b5c8e3745b0bc25ced167a68d9a33108cb"
-PARENT_HASH = "61195c1442cf410923ad36de66d80390be731b2831a8ea57b6f5ff10a8bc21ea"
-SAFE_HASH = "1676a239712f3709e52c5368f5fedd39e2f62266e2f1975f796cdda6932cb889"
-UNSAFE_HASH = "92aca90838df29acdcb6915f56ef836de634673a5d14546aa8d22a90902f0fb7"
-SOURCE_MANIFEST = ROOT / "deployments" / "studionet" / "SOURCE_MANIFEST.json"
-FEE_PROFILE = ROOT / "deployments" / "studionet" / "fee-profile.json"
-COVERAGE = ROOT / "artifacts" / "studionet" / "fee-profile-coverage.json"
-READINESS = ROOT / "deployments" / "studionet" / "DEPLOYMENT_READINESS.json"
+GOVERNOR_HASH = "1c53c221300a5fd4e901a3608c72f87c88ed14136f5a95f786a2854355270423"
+PARENT_HASH = "47bf21c12574ec8d43a41d79c987e1206b3c65b3e7f0e7998c8a3ff1179d2631"
+SAFE_HASH = "1073b34f141b9dc5ba689ef3d98293fd628e30695dbd9092a9c6ecaba3d8c27d"
+UNSAFE_HASH = "380c80e653a2d87e02648eec57dbfd46f898fb1a4cccfbe349c027ffa9149340"
+SOURCE_MANIFEST = ROOT / "deployments" / "studionet" / "v2.3" / "SOURCE_MANIFEST.json"
+FEE_PROFILE = ROOT / "deployments" / "studionet" / "v2.3" / "fee-profile.json"
+COVERAGE = ROOT / "artifacts" / "studionet" / "v2.3" / "fee-profile-coverage.json"
+READINESS = ROOT / "deployments" / "studionet" / "v2.3" / "DEPLOYMENT_READINESS.json"
 REQUESTED_METHODS = (
     "register_with_sentinelx", "register_target", "create_proposal",
     "stage_evidence", "capture_evidence", "review_proposal",
     "execute_reviewed_upgrade", "install_reviewed_upgrade", "confirm_install",
-    "reconcile_install", "set_protected_value", "set_release_note",
+    "retry_install_confirmation", "set_protected_value", "set_release_note",
     "cancel_proposal",
 )
 
@@ -216,7 +216,7 @@ def _write_profile_outputs(*, run: dict[str, Any], journal_obj: Any,
         key = str(item.get("method") or item.get("operation") or "unknown")
         grouped.setdefault(key, []).append(item)
     profile = {
-        "schema": "sentinelx-studionet-stable-fee-profile-v1",
+        "schema": "sentinelx-studionet-v23-fee-profile-v1",
         "network": "studionet",
         "rpc": stable_bridge.RPC,
         "chain_id": stable_bridge.CHAIN_ID,
@@ -244,8 +244,8 @@ def _write_profile_outputs(*, run: dict[str, Any], journal_obj: Any,
     measured = sorted(grouped)
     unmeasured = [name for name in REQUESTED_METHODS if name not in grouped]
     coverage = {
-        "schema": "sentinelx-studionet-stable-fee-profile-coverage-v1",
-        "profile_path": "deployments/studionet/fee-profile.json",
+        "schema": "sentinelx-studionet-v23-fee-profile-coverage-v1",
+        "profile_path": "deployments/studionet/v2.3/fee-profile.json",
         "profile_sha256": fee_hash,
         "network": "studionet",
         "rpc": stable_bridge.RPC,
@@ -267,8 +267,8 @@ def _write_profile_outputs(*, run: dict[str, Any], journal_obj: Any,
     safe_state: dict[str, Any] = safe_value if isinstance(safe_value, dict) else {}
     unsafe_state = run.get("unsafe_decision", "REJECTED")
     readiness = {
-        "schema": "sentinelx-studionet-stable-deployment-readiness-v1",
-        "phase": "STUDIONET_STABLE_QUALIFICATION",
+        "schema": "sentinelx-studionet-v23-deployment-readiness-v1",
+        "phase": "STUDIONET_V23_STABLE_QUALIFICATION",
         "status": "PROFILED_NON_CANONICAL",
         "git_sha": SOURCE_REVISION,
         "source_revision": SOURCE_REVISION,
@@ -282,8 +282,8 @@ def _write_profile_outputs(*, run: dict[str, Any], journal_obj: Any,
             "py_genlayer": "1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6",
         },
         "gates": {
-            "direct_tests": {"count": 145, "result": "PASS"},
-            "mutation_tests": {"count": 50, "killed": 50, "surviving": [], "result": "PASS"},
+            "direct_tests": {"count": 152, "result": "PASS"},
+            "mutation_tests": {"count": 55, "killed": 55, "surviving": [], "result": "PASS"},
             "static_lint": "PASS", "semantic_validation": "PASS", "contract_typecheck": "PASS",
             "preflight": "PASS", "frontend_tests": {"count": 17, "result": "PASS"},
             "frontend_typecheck": "PASS", "frontend_build": "PASS", "frontend_lint": "PASS",
@@ -305,7 +305,7 @@ def _write_profile_outputs(*, run: dict[str, Any], journal_obj: Any,
             "decision": unsafe_state, "installed": run.get("unsafe_installed"),
             "negative_state_preserved": run.get("negative_state_preserved"),
         },
-        "fee_profile": {"path": "deployments/studionet/fee-profile.json", "sha256": fee_hash, "coverage_path": "artifacts/studionet/fee-profile-coverage.json"},
+        "fee_profile": {"path": "deployments/studionet/v2.3/fee-profile.json", "sha256": fee_hash, "coverage_path": "artifacts/studionet/v2.3/fee-profile-coverage.json"},
         "historical_studio_dev": {"preserved": True, "new_writes": False, "excluded_from_stable_profile": True},
         "canonical_deployment": "NOT_YET_DEPLOYED",
     }
@@ -316,7 +316,7 @@ def _write_profile_outputs(*, run: dict[str, Any], journal_obj: Any,
 
 def main() -> int:
     if not SOURCE_REVISION or len(SOURCE_REVISION) != 40:
-        raise SystemExit("SENTINELX_STUDIONET_SOURCE_REVISION must be the pushed stable source commit SHA")
+        raise SystemExit("SENTINELX_STUDIONET_SOURCE_REVISION must be the pushed V2.3 source commit SHA")
     expected = {
         GOVERNOR_SOURCE: GOVERNOR_HASH, TARGET_SOURCE: PARENT_HASH,
         SAFE_SOURCE: SAFE_HASH, UNSAFE_SOURCE: UNSAFE_HASH,
@@ -361,9 +361,9 @@ def main() -> int:
         "RPC": stable_bridge.RPC,
         "CHAIN_ID": stable_bridge.CHAIN_ID,
         "EXPECTED_DEPLOYER": stable_bridge.EXPECTED_DEPLOYER,
-        "PROFILE_LABEL": "SENTINELX_STUDIONET_PROFILE_ONLY",
-        "DIRECT_TEST_COUNT": 145,
-        "MUTATION_TEST_COUNT": 50,
+        "PROFILE_LABEL": "SENTINELX_V23_STUDIONET_PROFILE_ONLY",
+        "DIRECT_TEST_COUNT": 152,
+        "MUTATION_TEST_COUNT": 55,
     }.items():
         setattr(legacy_orchestrator, name, value)
     # The historical orchestration module captured its RC parent-hash default

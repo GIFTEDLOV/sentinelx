@@ -169,6 +169,7 @@ class SentinelXV2Model:
         self.used_evidence_ids: set[str] = set()
         self.review_web_fetches: dict[int, int] = {}
         self.installed: set[tuple[str, str]] = set()
+        self.release_history: dict[str, list[int]] = {}
         self.next_id = 1
 
     def register_target(
@@ -684,10 +685,28 @@ class SentinelXV2Model:
         proposal = self.proposals[proposal_id]
         return proposal.status == QUEUED and self.now <= proposal.execution_deadline
 
-    def confirm_install(self, proposal_id: int) -> None:
+    def confirm_install(self, proposal_id: int, *, sender: str | None = None,
+                        candidate_hash: str | None = None) -> None:
         proposal = self.proposals[proposal_id]
-        if not self.authorized(proposal_id):
-            raise SentinelXError("Install authorization is absent")
+        sender = proposal.target if sender is None else sender
+        candidate_hash = proposal.candidate_code_hash if candidate_hash is None else candidate_hash
+        if sender != proposal.target:
+            raise SentinelXError("Only the protected target may confirm installation")
+        if proposal.status == VERIFIED:
+            if candidate_hash != proposal.candidate_code_hash:
+                raise SentinelXError("Conflicting duplicate installation")
+            return
+        if proposal.status != QUEUED or candidate_hash != proposal.candidate_code_hash:
+            raise SentinelXError("Install confirmation does not match authorization")
+        policy = self.policies[proposal.target]
+        if policy.policy_fingerprint != proposal.policy_fingerprint:
+            raise SentinelXError("Proposal policy fingerprint no longer matches")
+        if policy.current_code_hash != proposal.parent_code_hash:
+            raise SentinelXError("Proposal parent is no longer current")
+        if self.now > proposal.execution_deadline:
+            raise SentinelXError("Upgrade authorization has expired")
+        if self.active.get(proposal.target, 0) != proposal_id:
+            raise SentinelXError("Proposal is not the active target authorization")
         policy = self.policies[proposal.target]
         self.policies[proposal.target] = V2Policy(
             **{**policy.__dict__, "current_version": proposal.candidate_version,
@@ -697,6 +716,10 @@ class SentinelXV2Model:
         proposal.status = VERIFIED
         self.installed.add((proposal.target, proposal.candidate_code_hash))
         self.active[proposal.target] = 0
+        self.release_history.setdefault(proposal.target, []).append(proposal_id)
+
+    def reconcile_install(self, proposal_id: int, *, caller: str) -> None:
+        raise SentinelXError("Historical reconcile_install is unsupported; use target confirmation retry")
 
     def mark_timeout(self, proposal_id: int) -> str:
         proposal = self.proposals[proposal_id]
@@ -716,6 +739,8 @@ class SentinelXV2TargetModel:
         self.owner = owner
         self.registered_with_sentinelx = False
         self._pending_registration: dict[str, Any] | None = None
+        self.installed_proposal_id = 0
+        self.installed_candidate_hash = ""
 
     def is_registered_with_sentinelx(self) -> bool:
         return self.governor.is_target_registered(self.target)
@@ -744,3 +769,23 @@ class SentinelXV2TargetModel:
             request.update(overrides)
         self.governor.register_target(**request, caller=self.target)
         return True
+
+    def install_reviewed_upgrade(self, proposal_id: int) -> None:
+        proposal = self.governor.proposals[proposal_id]
+        if proposal.target != self.target or not self.governor.authorized(proposal_id):
+            raise SentinelXError("Install authorization is absent")
+        self.installed_proposal_id = proposal_id
+        self.installed_candidate_hash = proposal.candidate_code_hash
+
+    def retry_install_confirmation(self, proposal_id: int, *, caller: str) -> None:
+        if caller != self.owner:
+            raise SentinelXError("Only the protected application owner may call this method")
+        if self.installed_proposal_id != proposal_id:
+            raise SentinelXError("Requested proposal is not installed")
+        if not self.installed_candidate_hash:
+            raise SentinelXError("Installed candidate hash is missing")
+        self.governor.confirm_install(
+            self.installed_proposal_id,
+            sender=self.target,
+            candidate_hash=self.installed_candidate_hash,
+        )
