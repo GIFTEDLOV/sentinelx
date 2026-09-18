@@ -366,6 +366,17 @@ def main() -> int:
         "MUTATION_TEST_COUNT": 50,
     }.items():
         setattr(legacy_orchestrator, name, value)
+    # The historical orchestration module captured its RC parent-hash default
+    # in the function signature.  Pass the stable target hash explicitly so
+    # registration policy and staged parent bytes bind to this stable source.
+    historical_registration_args = legacy_orchestrator._registration_args
+
+    def _stable_registration_args(
+        governor: str, *, label: str, code_hash: str = PARENT_HASH
+    ) -> list[Any]:
+        return historical_registration_args(governor, label=label, code_hash=code_hash)
+
+    legacy_orchestrator._registration_args = _stable_registration_args
     legacy_orchestrator._write_profile_outputs = _write_profile_outputs
     return int(legacy_orchestrator.main())
 
