@@ -1,5 +1,44 @@
 {
-  "canonical_deployment": "NOT_YET_DEPLOYED",
+  "canonical": {
+    "compact_result_size": 827,
+    "governor": "0xb28b8E7F8930b4bd7Ed8572dA7e51AA4ca9D7cA8",
+    "installed_hash": "1073b34f141b9dc5ba689ef3d98293fd628e30695dbd9092a9c6ecaba3d8c27d",
+    "live_proof_path": "artifacts/studionet/v2.3/canonical-live-proof.json",
+    "manifest_path": "deployments/studionet/v2.3/CANONICAL_DEPLOYMENT.json",
+    "persistent_state_preserved": true,
+    "proposal_id": 1,
+    "proposal_state": "VERIFIED",
+    "review_decision": "APPROVE",
+    "review_vector": {
+      "behavioral_scope_matches_release": true,
+      "consensus_integrity_preserved": true,
+      "constitution_satisfied": true,
+      "evidence_trust_preserved": true,
+      "external_fetch_surface_safe": true,
+      "finality_safety_preserved": true,
+      "fund_flow_safe": true,
+      "liveness_preserved": true,
+      "migration_safety_preserved": true,
+      "no_privilege_escalation": true,
+      "public_interface_compatible": true,
+      "storage_layout_compatible": true,
+      "upgrade_authority_preserved": true,
+      "user_rights_preserved": true
+    },
+    "review_web_fetches": 0,
+    "safe_feature_verified": true,
+    "snapshot_digest": "be9f10d8b79c317df3cb24723dd9d3da329f1c0ef146de071e0157e16fc4aec6",
+    "target": "0xaF9ABA4DD9869d5F92EeA92c700E5f09A6978e21",
+    "upgrade_authority_preserved": true,
+    "value_nonce_preserved": true
+  },
+  "canonical_deployment": "CANONICAL_DEPLOYED",
+  "canonical_deployment_artifact_head": "55596ade32f3f76069b356d901a284e24c338d80",
+  "canonical_manifest": {
+    "path": "deployments/studionet/v2.3/CANONICAL_DEPLOYMENT.json",
+    "result": "PASS",
+    "sha256": "7e4ee1c1bdda7cfb8811d8dba7da804095789495a5c6983eb03eaf6ccc6051aa"
+  },
   "fee_profile": {
     "coverage_path": "artifacts/studionet/v2.3/fee-profile-coverage.json",
     "path": "deployments/studionet/v2.3/fee-profile.json",
@@ -7,6 +46,9 @@
   },
   "fee_profile_sha256": "9d50b9cc5fa0e6c66a32eebe9cc68c55f55662009e2f20f22ae6b80138f6776f",
   "gates": {
+    "canonical_live_proof": "PASS",
+    "canonical_safe_verified": "PASS",
+    "canonical_unsafe_reference": "PASS",
     "contract_typecheck": "PASS",
     "direct_tests": {
       "count": 152,
@@ -31,7 +73,7 @@
     "source_manifest": "PASS",
     "static_lint": "PASS"
   },
-  "git_sha": "11e43de2ba5d399e5585c23d0356468da5ab02e9",
+  "git_sha": "aefd62da2eaf152b28fcd2b10002fef8ffa7b4e4",
   "historical_studio_dev": {
     "excluded_from_stable_profile": true,
     "new_writes": false,
@@ -40,10 +82,21 @@
   "network": {
     "chain_id": 61999,
     "name": "Studionet",
-    "profile_only": true,
+    "profile_only": false,
     "rpc": "https://studio.genlayer.com/api"
   },
-  "phase": "STUDIONET_V23_STABLE_QUALIFICATION",
+  "phase": "CANONICAL_STUDIONET_RELEASE",
+  "profile_addresses_remain_non_canonical": true,
+  "provenance": {
+    "CANONICAL_DEPLOYED": "aefd62da2eaf152b28fcd2b10002fef8ffa7b4e4",
+    "PROFILED_NON_CANONICAL": {
+      "governor": "0x178Cc14e39E5873C4EaB2590B1a94b92694545ac",
+      "target": "0x9e0e22C8f35312E75C66f0255d4559f90e4fCd09"
+    },
+    "QUALIFIED": "7dca629f7e413deaffad106a6ccad30164ac4ea7",
+    "source_revision": "cfb25215497adeb41357196caa8c755a685b4cf2"
+  },
+  "qualification_head": "7dca629f7e413deaffad106a6ccad30164ac4ea7",
   "result": "PASS",
   "safe_profile": {
     "compact_result_size": 827,
@@ -83,8 +136,8 @@
     "unsafe": "380c80e653a2d87e02648eec57dbfd46f898fb1a4cccfbe349c027ffa9149340"
   },
   "source_manifest_sha256": "6a4ec43dbc02fe4b1efbf7ed49cca261cb9f4a63a320a379c9b61b10222e529a",
-  "source_revision": "220705747efbd4b1ea3a87ffddcfb84da5a25393",
-  "status": "PROFILED_NON_CANONICAL",
+  "source_revision": "cfb25215497adeb41357196caa8c755a685b4cf2",
+  "status": "CANONICAL_DEPLOYED",
   "toolchain": {
     "genlayer_js": "1.1.8",
     "genlayer_py": "0.18.0",
