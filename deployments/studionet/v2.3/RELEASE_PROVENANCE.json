@@ -6,7 +6,7 @@
   "source_revision": "cfb25215497adeb41357196caa8c755a685b4cf2",
   "qualification_head": "7dca629f7e413deaffad106a6ccad30164ac4ea7",
   "canonical_deployment_artifact_head": "55596ade32f3f76069b356d901a284e24c338d80",
-  "final_hardening_head": "4dadaf8fccaffacb3fe66f7d60e4099168aac071",
+  "final_hardening_head": "c2a97e830e25eefa25218b792e790d61fbf1b4ca",
   "canonical_deployment": {
     "status": "CANONICAL_DEPLOYED",
     "governor": "0xb28b8E7F8930b4bd7Ed8572dA7e51AA4ca9D7cA8",
