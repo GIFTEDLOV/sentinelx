@@ -293,8 +293,8 @@ def main() -> int:
             "registered": bridge.read(_CLIENT, target, "is_registered_with_sentinelx"),
         }
     else:
-        if bridge.read(_CLIENT, target, "get_installed_proposal_id") != 0 or bridge.read(_CLIENT, target, "get_installed_candidate_hash") != "" or bridge.read(_CLIENT, target, "is_registered_with_sentinelx") is not False:
-            raise RuntimeError("canonical target changed installed/registration state during resume")
+        if bridge.read(_CLIENT, target, "get_installed_proposal_id") != 0 or bridge.read(_CLIENT, target, "get_installed_candidate_hash") != "":
+            raise RuntimeError("canonical target changed installed state during resume")
     _assert_address(before["owner"], EXPECTED_SIGNER, "canonical target owner")
     _assert_address(before["governor"], governor, "canonical target governor")
     if before["installed_proposal_id"] != 0 or before["installed_candidate_hash"] != "" or before["registered"] is not False:
