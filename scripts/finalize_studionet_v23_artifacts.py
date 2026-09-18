@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -58,6 +59,16 @@ def main() -> int:
         journal_obj=journal_obj,
         preflight={"fee_policy": run.get("fee_policy", {})},
         initial_fee_estimate=run.get("initial_deploy_fee_estimate", {}),
+    )
+    readiness_path = profile.READINESS
+    readiness = json.loads(readiness_path.read_text(encoding="utf-8"))
+    readiness["git_sha"] = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], text=True
+    ).strip()
+    readiness_path.write_text(
+        json.dumps(readiness, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+        newline="\n",
     )
     print(json.dumps({
         "fee_profile_sha256": outputs["fee_profile_sha256"],

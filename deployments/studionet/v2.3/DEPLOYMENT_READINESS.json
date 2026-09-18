@@ -31,7 +31,7 @@
     "source_manifest": "PASS",
     "static_lint": "PASS"
   },
-  "git_sha": "220705747efbd4b1ea3a87ffddcfb84da5a25393",
+  "git_sha": "11e43de2ba5d399e5585c23d0356468da5ab02e9",
   "historical_studio_dev": {
     "excluded_from_stable_profile": true,
     "new_writes": false,
