@@ -1,0 +1,59 @@
+{
+  "schema": "sentinelx-studionet-finalized-view-probe-report-v1",
+  "diagnostic_only": true,
+  "network": "studionet",
+  "rpc": "https://studio.genlayer.com/api",
+  "chain_id": 61999,
+  "historical_profile": {
+    "governor": "0x2DCDbcC22B0b9B27dE2736A2469AE95755C7fc73",
+    "upgraded_target": "0x4c725401BCC000DAC7e52f5D6c5D3Dd5105fa6F2",
+    "writes_to_historical_profile": false
+  },
+  "runtime_api": {
+    "typed_interface": "SUPPORTED",
+    "generic_get_at": "SUPPORTED_AS_gl.get_contract_at"
+  },
+  "minimal": {
+    "target": "0x9a2440C1c4c46283B6f0b02c8eC6363f3F9F496C",
+    "caller": "0xD755eBAed78601cB11BF0723b567259dD11CE6E2",
+    "target_deploy_tx": "0x8ec4302e7042fe5f2ce8a0a1d61145ee14c89384d8c1ab01dbb6e5410dbb3997",
+    "caller_deploy_tx": "0xa2841332895536d0f18bbe895cb0033a8fca0175186d4c67d471a91d2ee20614",
+    "deployments": "FINALIZED / FINISHED_WITH_RETURN",
+    "direct_read": {"number": 17, "text": "finalized-view-probe"},
+    "default": {"tx": "0xcff27618a28ec9a4800e72e7c3b0831f1f0a49dd4329a30b3b5a502869ed5e09", "result": "FINALIZED / FINISHED_WITH_RETURN", "consensus": "MAJORITY_AGREE", "readback": 17},
+    "latest_finalized": {"tx": "0x81778c2bd854eb7b8e61f2ea389dafde6dadfc7f200838b9e3840c00d36c25d6", "status": "PROPOSING", "result": "NO_MAJORITY", "execution": "NOT_EXECUTED", "validator_votes": 0, "execution_hash": ""},
+    "latest_decided": {"tx": "0xd725b12e5b4bde6eb3a8bc7d8a2a0fdc4b7e8f085294e66ca2746278e0b1abeb", "status": "PENDING", "result": "NO_MAJORITY", "execution": "NOT_EXECUTED", "validator_votes": 0, "execution_hash": ""}
+  },
+  "upgraded_sentinelx": {
+    "target": "0x4c725401BCC000DAC7e52f5D6c5D3Dd5105fa6F2",
+    "caller": "0xCe0299DAAc3997539a21059C33e44B486edE958D",
+    "caller_deploy_tx": "0x16c3612c0cc7ab0cdb51273e946287de35d02f97af6b55ac6fd269a8c59266bb",
+    "default": {"tx": "0x1f91a7c7c8a41313c2024e075d08d9db9ae4f9e17c32f4a681bf91ddda48f642", "result": "FINALIZED / FINISHED_WITH_RETURN", "consensus": "MAJORITY_AGREE", "readback": "1:1676a239712f3709e52c5368f5fedd39e2f62266e2f1975f796cdda6932cb889"},
+    "latest_finalized": {"tx": "0xaeef97ebc20e151fa5d9ce4d155c8172653ec8b2f3e5dfb2fa580c4ec718b633", "status": "PROPOSING", "result": "NO_MAJORITY", "execution": "NOT_EXECUTED", "validator_votes": 0, "execution_hash": ""},
+    "latest_decided": {"tx": "0x593de8be50335f3b539fe0abbaa7a3699a1dde6b840cd7ea912fe8bb8e605b2f", "status": "PENDING", "result": "NO_MAJORITY", "execution": "NOT_EXECUTED", "validator_votes": 0, "execution_hash": ""},
+    "get_at_latest_finalized": {"tx": "0xe800bfa22edd876a931dab2c62fe86ba0a96055d6c88d7905d31837d6d59b017", "status": "PENDING", "result": "NO_MAJORITY", "execution": "NOT_EXECUTED", "validator_votes": 0, "execution_hash": ""}
+  },
+  "fresh_baseline_sentinelx": {
+    "target": "0xd05C4bca23E1d94324ff7dD2ab343924b7262efA",
+    "caller": "0x51D0A886BD4BA8D36a1961Cac7c1dA49bdF1D168",
+    "target_deploy_tx": "0xa878cb365e127825ba5ef779a77253283251bb64356adb9389a8690a38624c88",
+    "caller_deploy_tx": "0x3ef7a8a9641f6f76e1e99fc930d2ffe2b399194a1ed9ff19e0dee1dba1277f12",
+    "deployments": "FINALIZED / FINISHED_WITH_RETURN",
+    "default": {"tx": "0xdd322d35a94e271ae218f265fec00dfa01bdbdf4bb91dcffcb9341b49df60c3a", "result": "FINALIZED / FINISHED_WITH_RETURN", "consensus": "MAJORITY_AGREE", "readback": "0:"},
+    "latest_finalized": {"tx": "0x3cede82248d3272776df063c7e83d287ff75a7745f92b03c7c53c562d0747680", "status": "PROPOSING", "result": "NO_MAJORITY", "execution": "NOT_EXECUTED", "validator_votes": 0, "execution_hash": ""},
+    "latest_decided": {"tx": "0x2a18be462e93f2f115470421060507f62d4c04ae93ea649ae8f64e1e712c6cab", "status": "PENDING", "result": "NO_MAJORITY", "execution": "NOT_EXECUTED", "validator_votes": 0, "execution_hash": ""}
+  },
+  "classification": {
+    "failure_class": "HOSTED_STUDIONET_HISTORICAL_CROSS_CONTRACT_VIEW_RUNTIME",
+    "case": "A_EXTENDED",
+    "latest_finalized_confirmed_root_cause": true,
+    "latest_decided_also_affected": true,
+    "default_cross_contract_view_works": true,
+    "root_code_replacement_specific": false,
+    "typed_interface_specific": false,
+    "explanation": "Default cross-contract views finalize, while explicit LATEST_FINALIZED and LATEST_NON_FINAL (the stable equivalent used for LATEST_DECIDED) produce no-vote NO_MAJORITY projections on minimal, upgraded SentinelX, and fresh baseline SentinelX targets. gl.get_contract_at shows the same finalized-mode failure."
+  },
+  "production_source_changed": false,
+  "v2_3_created": false,
+  "canonical_deployment_attempted": false
+}
