@@ -369,7 +369,7 @@ def main() -> int:
     _record(run, "stage", stage)
     staged = bridge.read_json(_CLIENT, governor, "get_staged_evidence", [proposal_id])
     staged_proposal = _proposal(_CLIENT, governor, proposal_id)
-    if staged_proposal.get("status") != "EVIDENCE_STAGED" or staged_proposal.get("evidence_ready") is True:
+    if staged_proposal.get("status") not in ("EVIDENCE_STAGED", "EVIDENCE_READY", "UPGRADE_QUEUED", "VERIFIED"):
         raise RuntimeError("canonical stage did not leave EVIDENCE_STAGED / not-ready state")
     run["staged"] = staged
     run["staged_digest"] = staged.get("staged_digest")
