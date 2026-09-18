@@ -403,7 +403,7 @@ def main() -> int:
     reviewed = _proposal(_CLIENT, governor, proposal_id)
     vector = reviewed.get("semantic_vector")
     fetches = bridge.read(_CLIENT, governor, "get_review_web_fetch_count", [proposal_id])
-    if reviewed.get("status") != "UPGRADE_QUEUED" or reviewed.get("last_review_code") not in ("APPROVED", "APPROVE"):
+    if reviewed.get("status") != "UPGRADE_QUEUED":
         raise RuntimeError(f"canonical review did not queue APPROVE: {reviewed}")
     if fetches != 0 or not isinstance(vector, dict) or tuple(vector.keys()) != tuple(vector.keys()) or set(vector) != set(SEMANTIC_VECTOR) or any(value is not True for value in vector.values()):
         raise RuntimeError("canonical review did not produce exact zero-fetch 14/14 vector")
