@@ -1,6 +1,6 @@
 import { createClient } from "genlayer-js";
 import type { SentinelXConfig } from "./types";
-import { getRpcUrl, getSentinelXConfig, getStudioDevChain, STUDIO_DEV_CHAIN_ID, STUDIO_DEV_NAME } from "./chains";
+import { getRpcUrl, getSentinelXConfig, getStudionetChain, STUDIONET_CHAIN_ID, STUDIONET_NAME } from "./chains";
 
 export interface Eip1193Provider {
   request(args: { method: string; params?: unknown[] }): Promise<unknown>;
@@ -20,7 +20,7 @@ export function getInjectedProvider(): Eip1193Provider | undefined {
 
 export function getGenLayerClient(provider?: Eip1193Provider, account?: `0x${string}`) {
   const config = {
-    chain: getStudioDevChain(),
+    chain: getStudionetChain(),
     endpoint: getRpcUrl(),
     ...(account ? { account } : {}),
     ...(provider ? { provider: provider as never } : {}),
@@ -40,16 +40,16 @@ export async function getNetworkHealth(): Promise<{
     const chainId = await client.getChainId();
     const blockNumber = await client.getBlockNumber();
     return {
-      name: STUDIO_DEV_NAME,
+      name: STUDIONET_NAME,
       chainId,
       rpcUrl: getRpcUrl(),
       blockNumber: blockNumber.toString(),
-      status: chainId === STUDIO_DEV_CHAIN_ID ? "healthy" : "wrong-network",
+      status: chainId === STUDIONET_CHAIN_ID ? "healthy" : "wrong-network",
     };
   } catch {
     return {
-      name: STUDIO_DEV_NAME,
-      chainId: STUDIO_DEV_CHAIN_ID,
+      name: STUDIONET_NAME,
+      chainId: STUDIONET_CHAIN_ID,
       rpcUrl: getRpcUrl(),
       blockNumber: "—",
       status: "unavailable",
@@ -71,7 +71,7 @@ export async function connectWallet(): Promise<{ address: string; chainId?: numb
   const address = typeof accounts[0] === "string" ? accounts[0] : "";
   if (!address) throw new Error("Wallet returned no account");
   const chainId = await getWalletChainId(provider);
-  return { address, chainId, correctNetwork: chainId === STUDIO_DEV_CHAIN_ID };
+  return { address, chainId, correctNetwork: chainId === STUDIONET_CHAIN_ID };
 }
 
 export function configurationSummary(): SentinelXConfig {

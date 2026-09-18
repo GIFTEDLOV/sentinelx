@@ -9,7 +9,7 @@ import { shortAddress } from "@/lib/workflow";
 export function WalletControl() {
   const [state, setState] = useState<"disconnected" | "connecting" | "connected" | "wrong">("disconnected");
   const [address, setAddress] = useState<string>();
-  const connect = async () => { setState("connecting"); try { const result = await connectWallet(); setAddress(result.address); setState(result.correctNetwork ? "connected" : "wrong"); if (!result.correctNetwork) toast.error("Switch wallet to Studio-dev · chain 61997"); } catch (error) { setState("disconnected"); toast.error(String(error)); } };
+  const connect = async () => { setState("connecting"); try { const result = await connectWallet(); setAddress(result.address); setState(result.correctNetwork ? "connected" : "wrong"); if (!result.correctNetwork) toast.error("Switch wallet to Studionet · chain 61999"); } catch (error) { setState("disconnected"); toast.error(String(error)); } };
   useEffect(() => {
     const provider = getInjectedProvider();
     if (!provider?.on) return;

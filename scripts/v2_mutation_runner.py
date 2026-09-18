@@ -33,10 +33,10 @@ TARGET = ROOT / "contracts" / "protected_app_v1.py"
 ORACLE = ROOT / "direct" / "sentinelx_v2_model.py"
 ORACLE_BASE = ROOT / "direct" / "sentinelx_model.py"
 FROZEN_HASHES = {
-    GOVERNOR: "a93c6a5d77f49b75ef5d34d74c1a40bef2c7fab48c37c2e49756d1dc141eb6e8",
-    ROOT / "contracts" / "protected_app_v1.py": "470c9a72c63f8ca345956299edc530bc92924eaa1708c05a767b141df05d1c4f",
-    ROOT / "contracts" / "protected_app_v2_safe.py": "72c240f0725dc314429d01f051d4b40dc906623f48ba2b38514824d7f46011e5",
-    ROOT / "contracts" / "protected_app_v2_unsafe.py": "6b3f7a0ebae0f097036f33b57b77b1d10ae2d813b7330e34ba1dab33a5010653",
+    GOVERNOR: "0983e4a4cd0d9212aa791421daebbd290f6ee12e654fc51c0a99f05bc52d5758",
+    ROOT / "contracts" / "protected_app_v1.py": "24fd37bbe034f120106aa36d354128c59f0de254070cb588a6d6845bdb33bc06",
+    ROOT / "contracts" / "protected_app_v2_safe.py": "96d85dbab185e1288813167f2989167afae03a439a6aadd375ffeff546bdef23",
+    ROOT / "contracts" / "protected_app_v2_unsafe.py": "822d9f23e2b719d5638def87186562ef9f01c79001003b10f15493ce5564306d",
 }
 
 TARGET_ADDRESS = "0x" + "1" * 40

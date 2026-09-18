@@ -262,13 +262,22 @@ def reconcile_genlayer(
     except Exception as error:
         journal.update(operation, state="POLLING_ERROR", polling_error=str(error))
         raise
-    from genlayer_py.transactions import is_successful
-
     execution = receipt.get("tx_execution_result_name")
     if lifecycle["stored_status"] != "Finalized":
         journal.update(operation, state="NOT_FINALIZED", lifecycle=lifecycle)
         raise RuntimeError("receipt wait returned without a Finalized stored status")
-    if execution != "FINISHED_WITH_RETURN" or not is_successful(receipt):
+    # genlayer-py 0.18 removed the RC-only is_successful helper.  A finalized
+    # receipt with FINISHED_WITH_RETURN is the stable SDK's authoritative
+    # successful execution signal; retain the helper when an older SDK exposes
+    # it so this historical reconciliation utility remains backwards compatible.
+    successful = execution == "FINISHED_WITH_RETURN"
+    try:
+        from genlayer_py.transactions import is_successful
+    except ImportError:
+        is_successful = None
+    if is_successful is not None:
+        successful = successful and bool(is_successful(receipt))
+    if not successful:
         journal.update(
             operation, state="FINALIZED_EXECUTION_FAILED", lifecycle=lifecycle,
             execution_result=execution,

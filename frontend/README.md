@@ -1,8 +1,8 @@
 # SentinelX V2 console
 
 The Phase 2B console is a Next.js App Router application for semantic release
-security on GenLayer Intelligent Contracts. It uses GenLayerJS `2.0.0-rc.1`
-against Studio-dev (`61997`) and keeps the fee-aware, single-broadcast,
+security on GenLayer Intelligent Contracts. It uses GenLayerJS `1.1.8`
+against Studionet (`61999`) and keeps the fee-aware, single-broadcast,
 same-hash reconciliation standard documented in `../docs/TOOLCHAIN.md`.
 
 ## Local development
@@ -20,7 +20,7 @@ content is labelled and is not used by write adapters.
 Optional runtime configuration:
 
 ```text
-NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio-dev.genlayer.com/api
+NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api
 NEXT_PUBLIC_SENTINELX_GOVERNOR_ADDRESS=
 NEXT_PUBLIC_SENTINELX_CANONICAL_TARGET_ADDRESS=
 ```

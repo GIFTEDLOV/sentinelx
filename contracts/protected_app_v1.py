@@ -1,14 +1,13 @@
-# { "Depends": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
-import genlayer as gl
-from genlayer import Address, u256
+from genlayer import Address, gl, u256
 import hashlib
 
 
 TARGET_SCHEMA_VERSION = "sentinelx-target-v2"
 
 
-@gl.contract.interface
+@gl.contract_interface
 class SentinelXGovernorInterface:
     class View:
         def is_target_registered(self, target: str) -> bool: ...
@@ -44,7 +43,7 @@ class SentinelXGovernorInterface:
         def confirm_install(self, proposal_id: u256, candidate_hash: str) -> None: ...
 
 
-class ProtectedApplication(gl.contract.Contract):
+class ProtectedApplication(gl.Contract):
     """SentinelX V2 baseline target with a V1-compatible storage prefix.
 
     These fields are the historical V1 persistent layout reused as the V2

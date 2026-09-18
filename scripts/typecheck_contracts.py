@@ -1,4 +1,4 @@
-"""Type-check SentinelX contracts against the exact GLTest GenVM RC SDK."""
+"""Type-check SentinelX contracts against the pinned Studionet stable SDK."""
 
 from __future__ import annotations
 
@@ -17,14 +17,14 @@ CONTRACTS = (
     ROOT / "contracts" / "protected_app_v2_safe.py",
     ROOT / "contracts" / "protected_app_v2_unsafe.py",
 )
-GENVM_RC = "v0.6.0-rc3"
+GENVM_STABLE = "v0.2.12"
 _SDK_PATHS: list[Path] = []
 
 
 def check(path: Path) -> tuple[bool, str]:
     from gltest.direct.sdk_loader import setup_sdk_paths
 
-    sdk_paths = list(setup_sdk_paths(path, version=GENVM_RC))
+    sdk_paths = list(setup_sdk_paths(path, version=GENVM_STABLE))
     # GLTest avoids returning paths already present in this process's
     # sys.path. Retain the exact RC paths so each contract gets the same
     # environment when checked in one invocation.
@@ -86,7 +86,7 @@ def check(path: Path) -> tuple[bool, str]:
 
 
 def main() -> int:
-    results: dict[str, object] = {"genvm_rc": GENVM_RC, "ok": True, "contracts": {}}
+    results: dict[str, object] = {"genvm_runner": GENVM_STABLE, "ok": True, "contracts": {}}
     for path in CONTRACTS:
         try:
             ok, detail = check(path)

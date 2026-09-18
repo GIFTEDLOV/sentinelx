@@ -101,16 +101,14 @@ export async function getTargetState(address?: string): Promise<Record<string, u
 }
 
 export async function getTransactionLifecycle(hash: `0x${string}`): Promise<TransactionLifecycle> {
-  const lifecycle = await getGenLayerClient().advanced.getTransactionLifecycle({ hash: hash as GenLayerHash });
-  const state = lifecycle.storedStatus === "Finalized" ? "finalized" :
-    lifecycle.storedStatus === "Accepted" ? "decided" :
-      lifecycle.storedStatus === "Canceled" ? "canceled" : "processing";
+  const transaction = await getGenLayerClient().getTransaction({ hash: hash as GenLayerHash });
+  const status = String(transaction.statusName || transaction.status || "");
+  const state = status === "FINALIZED" ? "finalized" :
+    status === "ACCEPTED" ? "decided" :
+      status === "CANCELED" ? "canceled" : "processing";
   return {
     state,
-    storedStatus: lifecycle.storedStatus,
-    projectedStatus: lifecycle.projectedStatus,
-    resolutionAction: lifecycle.resolutionAction,
-    decisionId: lifecycle.decisionId,
-    decisionActive: lifecycle.decisionActive,
+    storedStatus: status,
+    projectedStatus: status,
   };
 }

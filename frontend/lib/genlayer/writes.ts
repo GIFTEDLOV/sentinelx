@@ -1,7 +1,7 @@
 import type { CalldataEncodable, Hash as GenLayerHash } from "genlayer-js/types";
-import { isSuccessful } from "genlayer-js";
+import { TransactionStatus } from "genlayer-js/types";
 import { getGenLayerClient, getInjectedProvider } from "./client";
-import { estimateWriteFees, feeEstimateToOptions } from "./fees";
+import { estimateWriteFees } from "./fees";
 import { getTransactionLifecycle } from "./reads";
 import { saveTransaction, updateTransaction } from "./transactions";
 import type { TransactionRecord } from "./types";
@@ -25,10 +25,10 @@ function sdkHash(value: `0x${string}`): GenLayerHash {
 export async function trackTransaction(operation: string, hash: `0x${string}`): Promise<TransactionRecord> {
   const client = getGenLayerClient(getInjectedProvider());
   try {
-    const receipt = await client.waitForTransactionReceipt({ hash: sdkHash(hash), waitUntil: "finalized", fullTransaction: true });
+    const receipt = await client.waitForTransactionReceipt({ hash: sdkHash(hash), status: TransactionStatus.FINALIZED });
     const lifecycle = await getTransactionLifecycle(hash);
     const executionResult = receipt.txExecutionResultName;
-    const successful = lifecycle.state === "finalized" && executionResult === "FINISHED_WITH_RETURN" && isSuccessful(receipt);
+    const successful = lifecycle.state === "finalized" && executionResult === "FINISHED_WITH_RETURN";
     const children = await client.getTriggeredTransactionIds({ hash: sdkHash(hash) });
     const record = updateTransaction(operation, {
       lifecycle,
@@ -57,12 +57,11 @@ export async function writeContractOnce(args: {
   const provider = getInjectedProvider();
   if (!provider) throw new Error("Connect a browser wallet before writing");
   const targetAddress = address(args.address);
-  const quote = await estimateWriteFees({
+  await estimateWriteFees({
     address: targetAddress,
     functionName: args.functionName,
     calldata: args.calldata,
     account: args.account,
-    developmentSimulation: args.developmentSimulation,
   });
   const submittedAt = new Date().toISOString();
   const client = getGenLayerClient(provider, args.account);
@@ -70,10 +69,10 @@ export async function writeContractOnce(args: {
     address: targetAddress,
     functionName: args.functionName,
     args: args.calldata as CalldataEncodable[] | undefined,
-    // The SDK-returned complete fee object is carried unchanged into signing.
-    // Gasless behavior is also estimator-driven: a zero quote is valid and is
-    // encoded by the SDK without any network-name special case.
-    fees: feeEstimateToOptions(quote.estimate),
+    // Stable genlayer-js 1.1.8 performs its native gas estimation inside
+    // writeContract. The explicit preflight quote above is retained for
+    // operator visibility; no RC fee object is passed to the stable SDK.
+    value: BigInt(0),
   }));
   // This is deliberately the first operation after the SDK returns a hash.
   saveTransaction({

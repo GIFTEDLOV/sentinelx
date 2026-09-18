@@ -1,12 +1,12 @@
-import { studioDevnet } from "genlayer-js/chains";
+import { studionet } from "genlayer-js/chains";
 import type { SentinelXConfig } from "./types";
 
-export const STUDIO_DEV_RPC = "https://studio-dev.genlayer.com/api";
-export const STUDIO_DEV_CHAIN_ID = 61997;
-export const STUDIO_DEV_NAME = "studio-dev";
+export const STUDIONET_RPC = "https://studio.genlayer.com/api";
+export const STUDIONET_CHAIN_ID = 61999;
+export const STUDIONET_NAME = "Studionet";
 
 export function getRpcUrl(): string {
-  return process.env.NEXT_PUBLIC_GENLAYER_RPC_URL?.trim() || STUDIO_DEV_RPC;
+  return process.env.NEXT_PUBLIC_GENLAYER_RPC_URL?.trim() || STUDIONET_RPC;
 }
 
 export function isAddress(value: string | undefined): value is `0x${string}` {
@@ -21,7 +21,7 @@ export function getSentinelXConfig(): SentinelXConfig {
     (!canonicalTargetAddress || isAddress(canonicalTargetAddress));
   return {
     rpcUrl,
-    chainId: STUDIO_DEV_CHAIN_ID,
+    chainId: STUDIONET_CHAIN_ID,
     governorAddress: addressesValid ? governorAddress : undefined,
     canonicalTargetAddress: addressesValid ? canonicalTargetAddress : undefined,
     feeProfileUrl: process.env.NEXT_PUBLIC_SENTINELX_FEE_PROFILE_URL?.trim() || undefined,
@@ -29,11 +29,11 @@ export function getSentinelXConfig(): SentinelXConfig {
   };
 }
 
-export function getStudioDevChain() {
-  if (studioDevnet.id !== STUDIO_DEV_CHAIN_ID) {
-    throw new Error("GenLayerJS studioDevnet does not match chain 61997");
+export function getStudionetChain() {
+  if (studionet.id !== STUDIONET_CHAIN_ID) {
+    throw new Error("GenLayerJS studionet does not match chain 61999");
   }
-  return studioDevnet;
+  return studionet;
 }
 
 export function previewEnabled(): boolean {

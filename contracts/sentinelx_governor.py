@@ -1,11 +1,14 @@
-# { "Depends": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
-import genlayer as gl
-from genlayer import Address, u64, u256
+from genlayer import Address, DynArray, TreeMap, allow_storage, gl, u64, u256
 from dataclasses import dataclass
 from datetime import datetime
-from genlayer.storage import DynArray, TreeMap
-from genlayer.vm.public_abi import StorageView
+from genlayer.py.public_abi import StorageType
+
+
+class StorageView:
+    LATEST_FINALIZED = StorageType.LATEST_FINAL
+    LATEST_DECIDED = StorageType.LATEST_NON_FINAL
 import hashlib
 import json
 import re
@@ -75,7 +78,7 @@ MAX_EXECUTION_TIMEOUT_SECONDS = 14 * 24 * 60 * 60
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 
-@gl.storage.allow
+@allow_storage
 @dataclass
 class TargetPolicy:
     owner: Address
@@ -99,7 +102,7 @@ class TargetPolicy:
     active: bool
 
 
-@gl.storage.allow
+@allow_storage
 @dataclass
 class ReleaseProposal:
     proposal_id: u256
@@ -128,7 +131,7 @@ class ReleaseProposal:
     review_vector: str
 
 
-@gl.storage.allow
+@allow_storage
 @dataclass
 class EvidenceSnapshotRecord:
     schema: str
@@ -158,7 +161,7 @@ class EvidenceSnapshotRecord:
     snapshot_digest: str
 
 
-@gl.storage.allow
+@allow_storage
 @dataclass
 class StagedEvidenceRecord:
     schema: str
@@ -182,7 +185,7 @@ class StagedEvidenceRecord:
     staged_digest: str
 
 
-@gl.contract.interface
+@gl.contract_interface
 class SentinelXTargetInterface:
     class View:
         def get_owner(self) -> Address: ...
@@ -216,7 +219,7 @@ def _is_exact_bool(value: object) -> bool:
     return type(value) is bool
 
 
-class SentinelXGovernor(gl.contract.Contract):
+class SentinelXGovernor(gl.Contract):
     """Multi-target release governor for SentinelX-protected ICs.
 
     Policies are registered once by the target itself and never mutated. A

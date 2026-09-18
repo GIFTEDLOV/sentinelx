@@ -1,55 +1,38 @@
-import type { CalldataEncodable, FeeEstimateOptions, TransactionFeeEstimate, TransactionFeeOptions } from "genlayer-js/types";
-import { getGenLayerClient, getInjectedProvider } from "./client";
-import { getRpcUrl, STUDIO_DEV_CHAIN_ID } from "./chains";
+import { getGenLayerClient } from "./client";
+import { getRpcUrl, STUDIONET_CHAIN_ID } from "./chains";
 
+/** Stable genlayer-js 1.1.x records native gas observations, not the RC fee wire object. */
 export interface MeasuredFeeEntry {
-  leaderTimeunitsAllocation: string;
-  validatorTimeunitsAllocation: string;
-  executionBudgetPerRound: string;
-  totalMessageFees: string;
-  rotationsPerRound: string;
+  gasUsed: string;
+  transactionValue: string;
 }
 
 export interface MeasuredFeeProfile {
   version: 1;
-  network: "studio_devnet";
-  chainId: 61997;
+  network: "studionet";
+  chainId: 61999;
   measuredAt: string;
   deploy?: MeasuredFeeEntry;
   methods: Record<string, MeasuredFeeEntry>;
 }
 
-function uint(value: string, label: string): number {
-  if (!/^\d+$/.test(value)) throw new Error(`${label} is not an unsigned decimal quantity`);
-  return Number(value);
-}
-
 function validEntry(entry: unknown): entry is MeasuredFeeEntry {
   if (!entry || typeof entry !== "object") return false;
-  return (["leaderTimeunitsAllocation", "validatorTimeunitsAllocation", "executionBudgetPerRound", "totalMessageFees", "rotationsPerRound"] as const).every((field) => typeof (entry as Record<string, unknown>)[field] === "string" && /^\d+$/.test((entry as Record<string, string>)[field]));
-}
-
-export function profileEntryToOptions(entry: MeasuredFeeEntry, appealRounds = 1): FeeEstimateOptions {
-  return {
-    leaderTimeunitsAllocation: uint(entry.leaderTimeunitsAllocation, "leaderTimeunitsAllocation"),
-    validatorTimeunitsAllocation: uint(entry.validatorTimeunitsAllocation, "validatorTimeunitsAllocation"),
-    appealRounds,
-    executionBudgetPerRound: uint(entry.executionBudgetPerRound, "executionBudgetPerRound"),
-    totalMessageFees: uint(entry.totalMessageFees, "totalMessageFees"),
-    rotations: Array.from({ length: appealRounds + 1 }, () => uint(entry.rotationsPerRound, "rotationsPerRound")),
-  };
+  const value = entry as Record<string, unknown>;
+  return typeof value.gasUsed === "string" && /^\d+$/.test(value.gasUsed) &&
+    typeof value.transactionValue === "string" && /^\d+$/.test(value.transactionValue);
 }
 
 export function validateFeeProfile(value: unknown): MeasuredFeeProfile {
   if (!value || typeof value !== "object") throw new Error("fee profile is not an object");
   const profile = value as Partial<MeasuredFeeProfile>;
-  if (profile.version !== 1 || profile.network !== "studio_devnet" || profile.chainId !== STUDIO_DEV_CHAIN_ID) {
-    throw new Error("fee profile is not for Studio-dev chain 61997");
+  if (profile.version !== 1 || profile.network !== "studionet" || profile.chainId !== STUDIONET_CHAIN_ID) {
+    throw new Error("fee profile is not for Studionet chain 61999");
   }
   if (!profile.methods || typeof profile.methods !== "object") throw new Error("fee profile methods are missing");
   if (profile.deploy && !validEntry(profile.deploy)) throw new Error("invalid deploy fee entry");
   for (const [method, entry] of Object.entries(profile.methods)) {
-    if (!validEntry(entry)) throw new Error(`invalid measured fee operation ${method}`);
+    if (!validEntry(entry)) throw new Error(`invalid measured stable gas entry ${method}`);
   }
   return profile as MeasuredFeeProfile;
 }
@@ -62,110 +45,42 @@ export async function loadMeasuredFeeProfile(): Promise<MeasuredFeeProfile> {
   return validateFeeProfile(await response.json());
 }
 
-/** Missing profile coverage is allowed; malformed configured profiles still fail closed. */
 export async function loadMeasuredFeeProfileIfConfigured(): Promise<MeasuredFeeProfile | undefined> {
   if (!process.env.NEXT_PUBLIC_SENTINELX_FEE_PROFILE_URL) return undefined;
   return loadMeasuredFeeProfile();
 }
 
-export type FeeQuoteSource = "measured-profile" | "network-default" | "write-simulation";
+export type FeeQuoteSource = "stable-sdk-native";
 
 export interface FeeQuote {
-  estimate: TransactionFeeEstimate;
   source: FeeQuoteSource;
-  gasless: boolean;
+  gasless: false;
 }
 
-function samePolicy(left: TransactionFeeEstimate["policy"], right: TransactionFeeEstimate["policy"]): boolean {
-  return left.enabled === right.enabled &&
-    left.genPerTimeUnit === right.genPerTimeUnit &&
-    left.storageUnitPrice === right.storageUnitPrice &&
-    left.receiptGasPrice === right.receiptGasPrice &&
-    left.executionBudgetFloor === right.executionBudgetFloor &&
-    left.timeUnitOverlayBps === right.timeUnitOverlayBps;
-}
-
-/** Gasless is a live estimator result, never a network-name assumption. */
-export function isGaslessFeeEstimate(estimate: TransactionFeeEstimate): boolean {
-  return estimate.policy.enabled === false || estimate.feeValue === BigInt(0);
-}
-
-function assertPolicyMatch(expected: TransactionFeeEstimate["policy"], estimate: TransactionFeeEstimate): void {
-  if (!samePolicy(expected, estimate.policy)) {
-    throw new Error("live fee policy changed during estimation; signing is blocked and the transaction must be re-estimated");
-  }
-}
-
-async function estimateWithPolicyCheck(
-  client: ReturnType<typeof getGenLayerClient>,
-  estimate: () => Promise<TransactionFeeEstimate>,
-): Promise<TransactionFeeEstimate> {
-  const policyBefore = await client.getCurrentFeePolicy();
-  const first = await estimate();
-  if (samePolicy(policyBefore, first.policy)) return first;
-
-  // A changed policy is never silently accepted. Re-estimate once against the
-  // new live policy, then fail closed if it moves again.
-  const policyBeforeRetry = await client.getCurrentFeePolicy();
-  const retry = await estimate();
-  assertPolicyMatch(policyBeforeRetry, retry);
-  return retry;
-}
-
+/**
+ * genlayer-js 1.1.8 owns the native gas estimate inside writeContract. No RC
+ * fee distribution, feeValue, or guessed quantity is manufactured here.
+ */
 export async function estimateWriteFees(args: {
   address: `0x${string}`;
   functionName: string;
   calldata?: unknown[];
   account?: `0x${string}`;
-  appealRounds?: number;
-  /** Explicit development/profiling escape hatch for one concrete write. */
-  developmentSimulation?: boolean;
 }): Promise<FeeQuote> {
-  const client = getGenLayerClient(getInjectedProvider(), args.account);
-  const profile = await loadMeasuredFeeProfileIfConfigured();
-  const entry = profile?.methods[args.functionName];
-  const useSimulation = args.developmentSimulation === true || process.env.NEXT_PUBLIC_SENTINELX_WRITE_SIMULATION === "true";
-
-  if (entry) {
-    const estimate = await estimateWithPolicyCheck(client, () => client.estimateTransactionFeesForWrite({
-      address: args.address,
-      functionName: args.functionName,
-      args: args.calldata as CalldataEncodable[] | undefined,
-      ...profileEntryToOptions(entry, args.appealRounds),
-    }));
-    return { estimate, source: "measured-profile", gasless: isGaslessFeeEstimate(estimate) };
-  }
-
-  if (useSimulation) {
-    const estimate = await estimateWithPolicyCheck(client, () => client.estimateTransactionFeesForWrite({
-      address: args.address,
-      functionName: args.functionName,
-      args: args.calldata as CalldataEncodable[] | undefined,
-      appealRounds: args.appealRounds,
-    }));
-    return { estimate, source: "write-simulation", gasless: isGaslessFeeEstimate(estimate) };
-  }
-
-  // genlayer-js delegates this to the current Studio/network policy. It is a
-  // complete fee object and does not require a developer fee-profile entry.
-  const estimate = await estimateWithPolicyCheck(client, () => client.estimateTransactionFees({
-    appealRounds: args.appealRounds,
-  }));
-  return { estimate, source: "network-default", gasless: isGaslessFeeEstimate(estimate) };
-}
-
-export function feeEstimateToOptions(estimate: TransactionFeeEstimate): TransactionFeeOptions {
-  return {
-    distribution: estimate.distribution,
-    ...(estimate.messageAllocations ? { messageAllocations: estimate.messageAllocations } : {}),
-    feeValue: estimate.feeValue,
-  };
+  if (!args.account) throw new Error("stable write estimation requires an account");
+  const client = getGenLayerClient(undefined, args.account);
+  await client.estimateTransactionGas({
+    from: args.account,
+    to: args.address,
+    value: BigInt(0),
+  });
+  return { source: "stable-sdk-native", gasless: false };
 }
 
 export function feeConfigurationSummary(): { configured: boolean; rpcUrl: string; chainId: number } {
   return {
     configured: Boolean(process.env.NEXT_PUBLIC_SENTINELX_FEE_PROFILE_URL),
     rpcUrl: getRpcUrl(),
-    chainId: STUDIO_DEV_CHAIN_ID,
+    chainId: STUDIONET_CHAIN_ID,
   };
 }

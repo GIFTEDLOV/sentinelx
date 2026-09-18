@@ -1,6 +1,9 @@
-# SentinelX Phase 1: Studio-dev / Consensus v0.6 RC family.
-genlayer-py==0.19.0rc2
-genlayer-test==0.30.0rc2
+# SentinelX Studionet stable qualification family.
+genlayer-py==0.18.0
+# genlayer-test 0.29.2 is installed with --no-deps in the stable
+# qualification environment because its published metadata still declares
+# the older SDK range; the mandated stable runtime is genlayer-py 0.18.0.
+genlayer-test==0.29.2
 genvm-linter==0.11.0
 web3==8.0.0
 pytest==8.4.1
