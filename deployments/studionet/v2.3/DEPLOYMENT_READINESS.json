@@ -73,7 +73,7 @@
     "source_manifest": "PASS",
     "static_lint": "PASS"
   },
-  "git_sha": "aefd62da2eaf152b28fcd2b10002fef8ffa7b4e4",
+  "git_sha": "fa083181c84d66ea4831e234d365ab34fe95790b",
   "historical_studio_dev": {
     "excluded_from_stable_profile": true,
     "new_writes": false,
@@ -88,7 +88,7 @@
   "phase": "CANONICAL_STUDIONET_RELEASE",
   "profile_addresses_remain_non_canonical": true,
   "provenance": {
-    "CANONICAL_DEPLOYED": "aefd62da2eaf152b28fcd2b10002fef8ffa7b4e4",
+    "CANONICAL_DEPLOYED": "fa083181c84d66ea4831e234d365ab34fe95790b",
     "PROFILED_NON_CANONICAL": {
       "governor": "0x178Cc14e39E5873C4EaB2590B1a94b92694545ac",
       "target": "0x9e0e22C8f35312E75C66f0255d4559f90e4fCd09"
