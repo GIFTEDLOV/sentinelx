@@ -1,7 +1,7 @@
 {
   "canonical_deployment_attempted": false,
   "chain_id": 61999,
-  "git_commit": "ea26b0389b223329e59e0d74deb62cb052ad3038",
+  "git_commit": "3f0250580353b527f0b4da1a4e6e05137744a87f",
   "historical_rc_revisions_preserved": [
     "V2",
     "V2.1",
@@ -18,19 +18,19 @@
       "sha256": "0983e4a4cd0d9212aa791421daebbd290f6ee12e654fc51c0a99f05bc52d5758"
     },
     "safe": {
-      "bytes": 7137,
+      "bytes": 7183,
       "path": "contracts/protected_app_v2_safe.py",
-      "sha256": "0f521440bb20f1dbe53841414c4bea15d57b9adcb02a70d84384c1cd77dc28ce"
+      "sha256": "1676a239712f3709e52c5368f5fedd39e2f62266e2f1975f796cdda6932cb889"
     },
     "target": {
-      "bytes": 7357,
+      "bytes": 7403,
       "path": "contracts/protected_app_v1.py",
-      "sha256": "10677c073abd2b92084f9951fedc00806a9e45cae933c145131891563d3df7ac"
+      "sha256": "61195c1442cf410923ad36de66d80390be731b2831a8ea57b6f5ff10a8bc21ea"
     },
     "unsafe": {
-      "bytes": 3882,
+      "bytes": 3928,
       "path": "contracts/protected_app_v2_unsafe.py",
-      "sha256": "708ac9a44c2c6ae9f26c16d17bd4e7630352a46dd40af72779afe968c8e91dcf"
+      "sha256": "92aca90838df29acdcb6915f56ef836de634673a5d14546aa8d22a90902f0fb7"
     }
   },
   "toolchain": {
