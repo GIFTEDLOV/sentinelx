@@ -1,0 +1,48 @@
+{
+  "canonical_deployment_attempted": false,
+  "chain_id": 61999,
+  "git_commit": "cfb25215497adeb41357196caa8c755a685b4cf2",
+  "historical_revisions_preserved": [
+    "V2",
+    "V2.1",
+    "V2.2 Studionet Stable",
+    "V2.2 Studio-dev"
+  ],
+  "network": "studionet",
+  "release": "SentinelX V2.3 Studionet Stable",
+  "rpc": "https://studio.genlayer.com/api",
+  "schema": "sentinelx-studionet-v23-source-manifest-v1",
+  "sources": {
+    "governor": {
+      "bytes": 99671,
+      "path": "contracts/sentinelx_governor.py",
+      "sha256": "1c53c221300a5fd4e901a3608c72f87c88ed14136f5a95f786a2854355270423"
+    },
+    "safe": {
+      "bytes": 7821,
+      "path": "contracts/protected_app_v2_safe.py",
+      "sha256": "1073b34f141b9dc5ba689ef3d98293fd628e30695dbd9092a9c6ecaba3d8c27d"
+    },
+    "target": {
+      "bytes": 8254,
+      "path": "contracts/protected_app_v1.py",
+      "sha256": "47bf21c12574ec8d43a41d79c987e1206b3c65b3e7f0e7998c8a3ff1179d2631"
+    },
+    "unsafe": {
+      "bytes": 4844,
+      "path": "contracts/protected_app_v2_unsafe.py",
+      "sha256": "380c80e653a2d87e02648eec57dbfd46f898fb1a4cccfbe349c027ffa9149340"
+    }
+  },
+  "toolchain": {
+    "genlayer_js": "1.1.8",
+    "genlayer_py": "0.18.0",
+    "genlayer_test": "0.29.2",
+    "genvm_linter": "0.11.0",
+    "genvm_runner": "v0.2.12",
+    "py_genlayer_dependency": {
+      "runner": "1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6",
+      "stdlib": "11rhn002yfajawsz7fai6mykznbxkxs6l91iskj5cm82c92qhy3v"
+    }
+  }
+}
