@@ -1,0 +1,48 @@
+{
+  "canonical_deployment_attempted": false,
+  "chain_id": 61999,
+  "git_commit": "2824a9e23cfadfb543793af757ac8fcecf8ce098",
+  "historical_rc_revisions_preserved": [
+    "V2",
+    "V2.1",
+    "V2.2 Studio-dev"
+  ],
+  "network": "studionet",
+  "release": "SentinelX V2.2 Studionet Stable",
+  "rpc": "https://studio.genlayer.com/api",
+  "schema": "sentinelx-studionet-stable-source-manifest-v1",
+  "sources": {
+    "governor": {
+      "bytes": 100509,
+      "path": "contracts/sentinelx_governor.py",
+      "sha256": "0983e4a4cd0d9212aa791421daebbd290f6ee12e654fc51c0a99f05bc52d5758"
+    },
+    "safe": {
+      "bytes": 6981,
+      "path": "contracts/protected_app_v2_safe.py",
+      "sha256": "96d85dbab185e1288813167f2989167afae03a439a6aadd375ffeff546bdef23"
+    },
+    "target": {
+      "bytes": 7201,
+      "path": "contracts/protected_app_v1.py",
+      "sha256": "24fd37bbe034f120106aa36d354128c59f0de254070cb588a6d6845bdb33bc06"
+    },
+    "unsafe": {
+      "bytes": 3726,
+      "path": "contracts/protected_app_v2_unsafe.py",
+      "sha256": "822d9f23e2b719d5638def87186562ef9f01c79001003b10f15493ce5564306d"
+    }
+  },
+  "toolchain": {
+    "genlayer_js": "1.1.8",
+    "genlayer_py": "0.18.0",
+    "genlayer_test": "0.29.2",
+    "genlayer_test_install_note": "genlayer-test 0.29.2 installed with --no-deps because its published metadata excludes the required stable genlayer-py 0.18 family; import and test execution were verified together.",
+    "genvm_linter": "0.11.0",
+    "genvm_runner": "v0.2.12",
+    "py_genlayer_dependency": {
+      "runner": "1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6",
+      "stdlib": "11rhn002yfajawsz7fai6mykznbxkxs6l91iskj5cm82c92qhy3v"
+    }
+  }
+}

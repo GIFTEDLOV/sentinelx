@@ -7,6 +7,10 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
+
+if str(Path(__file__).resolve().parents[1]) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 ROOT = Path(__file__).resolve().parents[1]
 RPC = "https://studio.genlayer.com/api"

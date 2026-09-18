@@ -1,0 +1,10 @@
+{
+  "canonical_deployment_attempted": false,
+  "chain_id": 61999,
+  "network": "Studionet",
+  "result": "PASS",
+  "rpc": "https://studio.genlayer.com/api",
+  "schema": "sentinelx-studionet-preflight-v1",
+  "source_manifest_sha256": "7392fb84e7553d6e8c729dfa3733d1a429c239782fd061892e06afefd30487c5",
+  "unresolved_journal_operations": []
+}
