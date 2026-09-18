@@ -71,8 +71,9 @@ class ProtectedApplication(gl.Contract):
         # assignments are constructor documentation for fresh deployments.
         self.owner = gl.message.sender_address
         # Stable py-genlayer delivers address calldata as text at the
-        # constructor boundary; normalize it before writing Address storage.
-        self.sentinelx_governor = Address(sentinelx_governor)
+        # constructor boundary; normalize it before any Address operation.
+        sentinelx_governor = Address(sentinelx_governor)
+        self.sentinelx_governor = sentinelx_governor
         self.application_name = application_name
         self.protected_value = initial_value
         self.value_nonce = 0
