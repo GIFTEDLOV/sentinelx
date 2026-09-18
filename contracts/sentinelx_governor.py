@@ -255,7 +255,9 @@ class SentinelXGovernor(gl.Contract):
     # ------------------------------------------------------------------
 
     def _now(self) -> int:
-        raw = str(gl.message.raw["datetime"])
+        # Stable py-genlayer exposes the wire message through message_raw;
+        # gl.message is the typed sender/value/chain view and has no raw field.
+        raw = str(gl.message_raw["datetime"])
         return int(datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp())
 
     def _evidence_now(self, proposal: ReleaseProposal, observed_now: int) -> int:
