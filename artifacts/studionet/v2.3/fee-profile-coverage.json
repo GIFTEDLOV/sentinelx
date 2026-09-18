@@ -1,0 +1,38 @@
+{
+  "canonical_deployment_attempted": false,
+  "chain_id": 61999,
+  "finalized_successful_observations": 26,
+  "historical_studio_dev_excluded": true,
+  "measured_operations": [
+    "cancel_proposal",
+    "capture_evidence",
+    "confirm_install",
+    "create_proposal",
+    "execute_reviewed_upgrade",
+    "install_reviewed_upgrade",
+    "register_target",
+    "register_with_sentinelx",
+    "review_proposal",
+    "set_protected_value",
+    "set_release_note",
+    "stage_evidence",
+    "v2.2.profile.deploy_governor",
+    "v2.2.profile.deploy_recovery_target",
+    "v2.2.profile.deploy_safe_target",
+    "v2.2.profile.deploy_unsafe_target"
+  ],
+  "network": "studionet",
+  "profile_only": true,
+  "profile_path": "deployments/studionet/v2.3/fee-profile.json",
+  "profile_sha256": "9d50b9cc5fa0e6c66a32eebe9cc68c55f55662009e2f20f22ae6b80138f6776f",
+  "rpc": "https://studio.genlayer.com/api",
+  "schema": "sentinelx-studionet-v23-fee-profile-coverage-v1",
+  "source_manifest_sha256": "6a4ec43dbc02fe4b1efbf7ed49cca261cb9f4a63a320a379c9b61b10222e529a",
+  "source_revision": "220705747efbd4b1ea3a87ffddcfb84da5a25393",
+  "unmeasured_operation_reasons": {
+    "retry_install_confirmation": "No successful finalized stable observation was available; no value was fabricated."
+  },
+  "unmeasured_operations": [
+    "retry_install_confirmation"
+  ]
+}

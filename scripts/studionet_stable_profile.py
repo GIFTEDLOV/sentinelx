@@ -347,6 +347,23 @@ def main() -> int:
     os.environ["SENTINELX_V22_SOURCE_REVISION"] = SOURCE_REVISION
     import scripts.studio_dev_v22_managed_profile as legacy_orchestrator
 
+    # Resume a submitted stable operation by reconciling its persisted hash
+    # before the historical orchestrator performs its nonce gate.  This path
+    # never constructs calldata or broadcasts; it only advances an existing
+    # journal entry and leaves ambiguous records for the normal hard stop.
+    original_account_preflight = legacy_orchestrator.account_preflight
+
+    def _resume_account_preflight(client: Any, expected_deployer: str, journal_obj: Any) -> dict[str, Any]:
+        result = original_account_preflight(client, expected_deployer, journal_obj)
+        for operation in list(result.get("unresolved_journal_operations", [])):
+            record = journal_obj.load()["operations"].get(operation, {})
+            tx_hash = record.get("tx_hash")
+            if isinstance(tx_hash, str) and tx_hash.startswith("0x"):
+                stable_bridge._reconcile(client, journal_obj, operation, tx_hash)
+        return original_account_preflight(client, expected_deployer, journal_obj)
+
+    legacy_orchestrator.account_preflight = _resume_account_preflight
+
     for name, value in {
         "SOURCE_MANIFEST": SOURCE_MANIFEST,
         "FEE_PROFILE": FEE_PROFILE,

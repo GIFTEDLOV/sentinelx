@@ -1,0 +1,102 @@
+{
+  "canonical_deployment": "NOT_YET_DEPLOYED",
+  "fee_profile": {
+    "coverage_path": "artifacts/studionet/v2.3/fee-profile-coverage.json",
+    "path": "deployments/studionet/v2.3/fee-profile.json",
+    "sha256": "9d50b9cc5fa0e6c66a32eebe9cc68c55f55662009e2f20f22ae6b80138f6776f"
+  },
+  "fee_profile_sha256": "9d50b9cc5fa0e6c66a32eebe9cc68c55f55662009e2f20f22ae6b80138f6776f",
+  "gates": {
+    "contract_typecheck": "PASS",
+    "direct_tests": {
+      "count": 152,
+      "result": "PASS"
+    },
+    "frontend_build": "PASS",
+    "frontend_lint": "PASS",
+    "frontend_tests": {
+      "count": 17,
+      "result": "PASS"
+    },
+    "frontend_typecheck": "PASS",
+    "mutation_tests": {
+      "count": 55,
+      "killed": 55,
+      "result": "PASS",
+      "surviving": []
+    },
+    "preflight": "PASS",
+    "secret_scan": "PASS",
+    "semantic_validation": "PASS",
+    "source_manifest": "PASS",
+    "static_lint": "PASS"
+  },
+  "git_sha": "220705747efbd4b1ea3a87ffddcfb84da5a25393",
+  "historical_studio_dev": {
+    "excluded_from_stable_profile": true,
+    "new_writes": false,
+    "preserved": true
+  },
+  "network": {
+    "chain_id": 61999,
+    "name": "Studionet",
+    "profile_only": true,
+    "rpc": "https://studio.genlayer.com/api"
+  },
+  "phase": "STUDIONET_V23_STABLE_QUALIFICATION",
+  "safe_profile": {
+    "compact_result_size": 827,
+    "governor": "0x178Cc14e39E5873C4EaB2590B1a94b92694545ac",
+    "installed_hash": "1073b34f141b9dc5ba689ef3d98293fd628e30695dbd9092a9c6ecaba3d8c27d",
+    "persistent_state_preserved": true,
+    "proposal_id": 1,
+    "proposal_state": "VERIFIED",
+    "review_decision": "APPROVE",
+    "review_time_web_fetches": 0,
+    "review_vector": {
+      "behavioral_scope_matches_release": true,
+      "consensus_integrity_preserved": true,
+      "constitution_satisfied": true,
+      "evidence_trust_preserved": true,
+      "external_fetch_surface_safe": true,
+      "finality_safety_preserved": true,
+      "fund_flow_safe": true,
+      "liveness_preserved": true,
+      "migration_safety_preserved": true,
+      "no_privilege_escalation": true,
+      "public_interface_compatible": true,
+      "storage_layout_compatible": true,
+      "upgrade_authority_preserved": true,
+      "user_rights_preserved": true
+    },
+    "safe_feature_verified": true,
+    "snapshot_digest": "cf48a448ca086f1e3ad95e288ae475c8396624e15b31675ee5c79b595c1d6ddd",
+    "target": "0x9e0e22C8f35312E75C66f0255d4559f90e4fCd09",
+    "upgrade_authority_preserved": true
+  },
+  "schema": "sentinelx-studionet-v23-deployment-readiness-v1",
+  "source_hashes": {
+    "governor": "1c53c221300a5fd4e901a3608c72f87c88ed14136f5a95f786a2854355270423",
+    "safe": "1073b34f141b9dc5ba689ef3d98293fd628e30695dbd9092a9c6ecaba3d8c27d",
+    "target": "47bf21c12574ec8d43a41d79c987e1206b3c65b3e7f0e7998c8a3ff1179d2631",
+    "unsafe": "380c80e653a2d87e02648eec57dbfd46f898fb1a4cccfbe349c027ffa9149340"
+  },
+  "source_manifest_sha256": "6a4ec43dbc02fe4b1efbf7ed49cca261cb9f4a63a320a379c9b61b10222e529a",
+  "source_revision": "220705747efbd4b1ea3a87ffddcfb84da5a25393",
+  "status": "PROFILED_NON_CANONICAL",
+  "toolchain": {
+    "genlayer_js": "1.1.8",
+    "genlayer_py": "0.18.0",
+    "genlayer_test": "0.29.2",
+    "genvm_linter": "0.11.0",
+    "genvm_runner": "v0.2.12",
+    "py_genlayer": "1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6"
+  },
+  "unsafe_profile": {
+    "decision": "REJECTED",
+    "installed": false,
+    "negative_state_preserved": true,
+    "proposal_id": 2,
+    "target": "0xD8F0Ce45738c86bA2C3D6c2595cFcc357Ae04920"
+  }
+}

@@ -248,6 +248,24 @@ def submit(
 ) -> dict[str, Any]:
     existing = _persisted_hash(journal_obj, operation)
     if existing:
+        existing_record = journal_obj.load()["operations"].get(operation, {})
+        # A resumed profile must not re-poll every historical transaction.
+        # The journal is written only after the authoritative FINALIZED /
+        # FINISHED_WITH_RETURN check, so rehydrate that immutable observation
+        # locally.  Non-terminal or incomplete records still take the normal
+        # reconciliation path below.
+        if (
+            existing_record.get("state") == "FINALIZED_EXECUTED"
+            and existing_record.get("lifecycle_status") == "FINALIZED"
+            and existing_record.get("execution_result") == "FINISHED_WITH_RETURN"
+        ):
+            children = existing_record.get("triggered_transaction_ids", [])
+            return {
+                "tx_hash": existing,
+                "receipt": existing_record.get("receipt", {}),
+                "children": list(children) if isinstance(children, list) else [],
+                "reused": True,
+            }
         receipt, children = _reconcile(client, journal_obj, operation, existing)
         return {"tx_hash": existing, "receipt": receipt, "children": children, "reused": True}
     if operation in journal_obj.load()["operations"]:
@@ -344,6 +362,17 @@ def track_children(*, client: Any, journal_obj: Any, parent_operation: str, chil
     for index, child_hash in enumerate(children):
         child_operation = f"{parent_operation}.child.{index}"
         existing = _persisted_hash(journal_obj, child_operation)
+        existing_record = journal_obj.load()["operations"].get(child_operation, {})
+        if (
+            existing
+            and existing_record.get("state") == "FINALIZED_EXECUTION_FAILED"
+            and existing_record.get("lifecycle_status") == "FINALIZED"
+        ):
+            # Negative child executions are terminal observations too.  Keep
+            # their hash for coverage and do not turn a completed negative
+            # proof into an artificial unresolved transaction on resume.
+            all_children.append(_hash(child_hash))
+            continue
         if existing is None:
             journal_obj.reserve_broadcast(child_operation, parent_operation=parent_operation, fee_observation_kind="child")
             journal_obj.record_submission(child_operation, _hash(child_hash), parent_operation=parent_operation)

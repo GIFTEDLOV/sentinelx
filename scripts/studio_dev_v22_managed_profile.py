@@ -114,6 +114,14 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
+def _address_key(value: Any) -> str:
+    """Normalize stable SDK address wrappers for equality-only readbacks."""
+    text = str(value).strip().lower()
+    if text.startswith("addr#"):
+        text = text[5:]
+    return text[2:] if text.startswith("0x") else text
+
+
 def _read_run() -> dict[str, Any]:
     if not RUN_PATH.exists():
         return {}
@@ -219,6 +227,30 @@ def _registration_args(governor: str, *, label: str, code_hash: str = PARENT_HAS
 def _deploy_target(
     *, client: Any, journal_obj: Any, governor: str, operation: str, label: str,
 ) -> tuple[str, dict[str, Any]]:
+    # A resumed profile must use the address persisted immediately after the
+    # original deployment.  Stable Studionet receipts can omit the deployment
+    # address when they are reconciled from the journal, even though the
+    # original deployment and source-parity proof are complete.  Reusing the
+    # address is read-only and prevents an accidental second deployment.
+    stored_run = _read_run()
+    stored_key = {
+        "v2.2.profile.deploy_safe_target": "safe_target",
+        "v2.2.profile.deploy_unsafe_target": "unsafe_target",
+        "v2.2.profile.deploy_recovery_target": "recovery_target",
+    }.get(operation)
+    stored_target = stored_run.get(stored_key) if stored_key else None
+    if isinstance(stored_target, str) and stored_target:
+        # The safe profile target has already completed the upgrade when a
+        # resumed run reaches this point, so its current Root.code is the
+        # frozen safe candidate rather than the baseline parent source.
+        parity_source = SAFE_SOURCE if stored_key == "safe_target" else TARGET_SOURCE
+        _verify_cli_source(stored_target, parity_source)
+        return stored_target, {
+            "tx_hash": _tx_hash(journal_obj, operation),
+            "receipt": {"contract_address": stored_target},
+            "children": [],
+            "all_children": [],
+        }
     result = _submit_and_track(
         client=client,
         journal_obj=journal_obj,
@@ -240,6 +272,25 @@ def _create_proposal(
     operation: str, version: str, source: Path, candidate_hash: str,
     ci: dict[str, object], intent: str,
 ) -> tuple[int, dict[str, Any]]:
+    # A prior run can have finalized proposal creation and advanced the
+    # proposal beyond an active state (for example to VERIFIED).  In that
+    # case get_active_proposal is intentionally zero, so recover the exact
+    # proposal id from the persisted run state instead of treating a resumed
+    # operation as a new proposal.
+    stored_run = _read_run()
+    stored_key = {
+        "v2.2.profile.safe_create_proposal": "safe_proposal_id",
+        "v2.2.profile.unsafe_create_proposal": "unsafe_proposal_id",
+    }.get(operation)
+    stored_id = stored_run.get(stored_key) if stored_key else None
+    if isinstance(stored_id, (int, str)) and int(stored_id) > 0:
+        return int(stored_id), {
+            "tx_hash": _tx_hash(journal_obj, operation),
+            "receipt": {},
+            "children": [],
+            "all_children": [],
+            "reused": True,
+        }
     result = _submit_and_track(
         client=client,
         journal_obj=journal_obj,
@@ -602,15 +653,26 @@ def main() -> int:
         run.setdefault(key, value)
     _save_run(run)
 
-    governor_result = _submit_and_track(
-        client=client,
-        journal_obj=journal_obj,
-        operation="v2.2.profile.deploy_governor",
-        kind="deploy",
-        source=GOVERNOR_SOURCE,
-        metadata={"contract_name": "sentinelx_governor", "profile_label": PROFILE_LABEL},
-    )
-    governor = _contract_address(governor_result["receipt"])
+    stored_governor = run.get("governor")
+    if isinstance(stored_governor, str) and stored_governor:
+        _verify_cli_source(stored_governor, GOVERNOR_SOURCE)
+        governor_result = {
+            "tx_hash": _tx_hash(journal_obj, "v2.2.profile.deploy_governor"),
+            "receipt": {"contract_address": stored_governor},
+            "children": [],
+            "all_children": [],
+        }
+        governor = stored_governor
+    else:
+        governor_result = _submit_and_track(
+            client=client,
+            journal_obj=journal_obj,
+            operation="v2.2.profile.deploy_governor",
+            kind="deploy",
+            source=GOVERNOR_SOURCE,
+            metadata={"contract_name": "sentinelx_governor", "profile_label": PROFILE_LABEL},
+        )
+        governor = _contract_address(governor_result["receipt"])
     if not governor:
         raise SystemExit("V2.2 governor deployment returned no address")
     run.update({
@@ -683,14 +745,16 @@ def main() -> int:
     })
     _save_run(run)
 
-    safe_ci = _publish_ci_evidence(
-        target=safe_target,
-        policy_fingerprint=str(policy["policy_fingerprint"]),
-        candidate_hash=SAFE_HASH,
-        candidate_source=SAFE_SOURCE,
-        label="v22-safe",
-        published_at=max(0, int(time.time()) - CI_CLOCK_SKEW_SECONDS),
-    )
+    safe_ci = run.get("safe_ci")
+    if not isinstance(safe_ci, dict):
+        safe_ci = _publish_ci_evidence(
+            target=safe_target,
+            policy_fingerprint=str(policy["policy_fingerprint"]),
+            candidate_hash=SAFE_HASH,
+            candidate_source=SAFE_SOURCE,
+            label="v22-safe",
+            published_at=max(0, int(time.time()) - CI_CLOCK_SKEW_SECONDS),
+        )
     run["safe_ci"] = safe_ci
     _save_run(run)
     safe_ci_bytes = (json.dumps(safe_ci["envelope"], indent=2, sort_keys=True) + "\n").encode("utf-8")
@@ -729,8 +793,11 @@ def main() -> int:
     # A resumed profile may already have completed capture after this stage
     # transaction finalized.  Preserve the original staged-state assertion
     # while accepting that replay-safe EVIDENCE_READY readback.
-    if staged_proposal.get("status") not in ("EVIDENCE_STAGED", "EVIDENCE_READY") or staged.get("security_present") is not False:
+    staged_status = staged_proposal.get("status")
+    if staged_status not in ("EVIDENCE_STAGED", "EVIDENCE_READY", "UPGRADE_QUEUED", "VERIFIED"):
         raise SystemExit("staging did not leave safe proposal in explicit EVIDENCE_STAGED state")
+    if staged_status in ("EVIDENCE_STAGED", "EVIDENCE_READY") and staged.get("security_present") is not False:
+        raise SystemExit("staging readback is not the expected OPTIONAL evidence state")
     run.update({
         "stage_evidence_tx": stage["tx_hash"],
         "stage_evidence_result": "FINALIZED_FINISHED_WITH_RETURN",
@@ -765,30 +832,53 @@ def main() -> int:
     })
     _save_run(run)
 
-    review = _submit_and_track(
-        client=client,
-        journal_obj=journal_obj,
-        operation="v2.2.profile.safe_review_proposal",
-        kind="method",
-        method="review_proposal",
-        address=governor,
-        args=[safe_proposal_id],
-    )
-    _tag(journal_obj, "v2.2.profile.safe_review_proposal", method="review_proposal")
     reviewed_state = read_json(client, governor, "get_proposal", [safe_proposal_id])
-    if reviewed_state.get("status") != "UPGRADE_QUEUED":
+    if reviewed_state.get("status") == "VERIFIED":
+        # Safe installation and target-originated confirmation already
+        # finalized before a tooling-only interruption.  Reuse those exact
+        # journaled transactions and continue with feature/negative proof.
+        review = {
+            "tx_hash": _tx_hash(journal_obj, "v2.2.profile.safe_review_proposal"),
+            "children": [],
+            "all_children": [],
+            "reused": True,
+        }
+        execute_record = _operation_record(
+            journal_obj, "v2.2.profile.safe_execute_reviewed_upgrade"
+        )
+        execute_children = execute_record.get("triggered_transaction_ids", [])
+        execute = {
+            "tx_hash": _tx_hash(journal_obj, "v2.2.profile.safe_execute_reviewed_upgrade"),
+            "children": list(execute_children) if isinstance(execute_children, list) else [],
+            "all_children": list(execute_children) if isinstance(execute_children, list) else [],
+            "reused": True,
+        }
+    else:
+        review = _submit_and_track(
+            client=client,
+            journal_obj=journal_obj,
+            operation="v2.2.profile.safe_review_proposal",
+            kind="method",
+            method="review_proposal",
+            address=governor,
+            args=[safe_proposal_id],
+        )
+        _tag(journal_obj, "v2.2.profile.safe_review_proposal", method="review_proposal")
+        reviewed_state = read_json(client, governor, "get_proposal", [safe_proposal_id])
+    if reviewed_state.get("status") not in ("UPGRADE_QUEUED", "VERIFIED"):
         raise SystemExit(f"safe semantic review did not queue exact approved authorization: {reviewed_state}")
-    execute = _submit_and_track(
-        client=client,
-        journal_obj=journal_obj,
-        operation="v2.2.profile.safe_execute_reviewed_upgrade",
-        kind="method",
-        method="execute_reviewed_upgrade",
-        address=governor,
-        args=[safe_proposal_id],
-        child_methods=["install_reviewed_upgrade"],
-    )
-    _tag(journal_obj, "v2.2.profile.safe_execute_reviewed_upgrade", method="execute_reviewed_upgrade")
+    if reviewed_state.get("status") == "UPGRADE_QUEUED":
+        execute = _submit_and_track(
+            client=client,
+            journal_obj=journal_obj,
+            operation="v2.2.profile.safe_execute_reviewed_upgrade",
+            kind="method",
+            method="execute_reviewed_upgrade",
+            address=governor,
+            args=[safe_proposal_id],
+            child_methods=["install_reviewed_upgrade"],
+        )
+        _tag(journal_obj, "v2.2.profile.safe_execute_reviewed_upgrade", method="execute_reviewed_upgrade")
     if execute.get("children"):
         _tag(journal_obj, "v2.2.profile.safe_execute_reviewed_upgrade.child.0.child.0", method="confirm_install")
     safe_state = read_json(client, governor, "get_proposal", [safe_proposal_id])
@@ -813,10 +903,10 @@ def main() -> int:
         "safe_final_state": safe_state,
         "review_time_web_fetches": read(client, governor, "get_review_web_fetch_count", [safe_proposal_id]),
         "final_target_state": target_after,
-        "final_installed_version": read(client, governor, "get_target_policy", [safe_target]).get("current_version"),
+        "final_installed_version": read_json(client, governor, "get_target_policy", [safe_target]).get("current_version"),
         "final_installed_hash": target_after["installed_candidate_hash"],
         "persistent_state_preserved": target_after["value"] == run["persistent_value_before_upgrade"] and target_after["nonce"] == run["persistent_nonce_before_upgrade"],
-        "upgrade_authority_preserved": str(target_after["governor"]).lower() == str(governor).lower(),
+        "upgrade_authority_preserved": _address_key(target_after["governor"]) == _address_key(governor),
     })
     if run["review_time_web_fetches"] != 0 or target_after["registered"] is not True or target_after["installed_proposal_id"] != safe_proposal_id or target_after["installed_candidate_hash"] != SAFE_HASH:
         raise SystemExit("safe V2.2 trust consequence readback is incomplete")
