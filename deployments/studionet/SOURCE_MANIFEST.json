@@ -1,7 +1,7 @@
 {
   "canonical_deployment_attempted": false,
   "chain_id": 61999,
-  "git_commit": "3f0250580353b527f0b4da1a4e6e05137744a87f",
+  "git_commit": "4ecaa22161ca6b9bb7dfb6f6b0fa652da03ca7a1",
   "historical_rc_revisions_preserved": [
     "V2",
     "V2.1",
@@ -13,9 +13,9 @@
   "schema": "sentinelx-studionet-stable-source-manifest-v1",
   "sources": {
     "governor": {
-      "bytes": 100509,
+      "bytes": 100664,
       "path": "contracts/sentinelx_governor.py",
-      "sha256": "0983e4a4cd0d9212aa791421daebbd290f6ee12e654fc51c0a99f05bc52d5758"
+      "sha256": "7faa2d90563a00a5f64b09ee45ce82b5c8e3745b0bc25ced167a68d9a33108cb"
     },
     "safe": {
       "bytes": 7183,
