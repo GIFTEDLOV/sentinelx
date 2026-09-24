@@ -3,6 +3,7 @@ name: SentinelX V2 quality
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,8 +20,8 @@ jobs:
     env:
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install deterministic stable release stack
@@ -60,8 +61,8 @@ jobs:
     name: frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -86,8 +87,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -115,7 +116,7 @@ jobs:
         run: npm run test:browser -- e2e/production.spec.ts
       - name: Upload local Playwright artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-local-artifacts
           path: |
@@ -129,8 +130,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -147,7 +148,7 @@ jobs:
         run: npm run test:browser -- e2e/production.spec.ts
       - name: Upload production Playwright artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-production-artifacts
           path: |
@@ -159,8 +160,8 @@ jobs:
     name: secret-scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: python scripts/secret_scan.py
