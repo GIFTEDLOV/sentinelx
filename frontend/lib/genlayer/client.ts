@@ -1,6 +1,6 @@
 import { createClient } from "genlayer-js";
 import type { SentinelXConfig } from "./types";
-import { getRpcUrl, getSentinelXConfig, getStudionetChain, STUDIONET_CHAIN_ID, STUDIONET_NAME } from "./chains";
+import { getBrowserRpcEndpoint, getRpcUrl, getSentinelXConfig, getStudionetChain, STUDIONET_CHAIN_ID, STUDIONET_NAME } from "./chains";
 
 export interface Eip1193Provider {
   request(args: { method: string; params?: unknown[] }): Promise<unknown>;
@@ -21,7 +21,7 @@ export function getInjectedProvider(): Eip1193Provider | undefined {
 export function getGenLayerClient(provider?: Eip1193Provider, account?: `0x${string}`) {
   const config = {
     chain: getStudionetChain(),
-    endpoint: getRpcUrl(),
+    endpoint: getBrowserRpcEndpoint(),
     ...(account ? { account } : {}),
     ...(provider ? { provider: provider as never } : {}),
   };

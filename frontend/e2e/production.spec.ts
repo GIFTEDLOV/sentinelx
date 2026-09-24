@@ -35,7 +35,7 @@ async function auditRoute(page: Page, route: string): Promise<void> {
   page.on("requestfailed", (request) => failedRequests.push(`${request.method()} ${request.url()} ${request.failure()?.errorText || "failed"}`));
   page.on("response", (response) => { if (response.status() >= 400) badResponses.push(`${response.status()} ${response.url()}`); });
   if (/localhost|127\.0\.0\.1/.test(process.env.SENTINELX_BROWSER_BASE_URL || "")) {
-    await page.route("https://studio.genlayer.com/api", async (requestRoute) => {
+    await page.route("**/api/genlayer", async (requestRoute) => {
       const payload = requestRoute.request().postDataJSON() as { method?: string } | null;
       await requestRoute.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: 1, result: payload?.method === "eth_chainId" ? "0xf22f" : "0x100" }) });
     });

@@ -11,6 +11,15 @@ export function getRpcUrl(): string {
   return process.env.NEXT_PUBLIC_GENLAYER_RPC_URL?.trim() || STUDIONET_RPC;
 }
 
+/**
+ * Browser reads use the same-origin proxy so stable Studionet RPC calls do not
+ * depend on the upstream endpoint exposing browser CORS headers. The displayed
+ * and validated network identity remains the canonical Studionet RPC above.
+ */
+export function getBrowserRpcEndpoint(): string {
+  return typeof window === "undefined" ? getRpcUrl() : "/api/genlayer";
+}
+
 export function isAddress(value: string | undefined): value is `0x${string}` {
   return Boolean(value && /^0x[0-9a-fA-F]{40}$/.test(value));
 }
