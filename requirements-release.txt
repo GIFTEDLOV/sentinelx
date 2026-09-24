@@ -1,0 +1,11 @@
+# SentinelX V2.3 stable Studionet qualification requirements.
+# Install this file first with constraints-release.txt, then install
+# genlayer-test with --no-deps as documented in docs/TOOLCHAIN_COMPATIBILITY.md.
+genlayer-py==0.18.0
+genvm-linter==0.11.0
+web3==8.0.0
+pytest==8.4.1
+pyright==1.1.410
+colorama==0.4.6
+python-dotenv==1.2.3
+PyYAML==6.0.3

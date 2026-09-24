@@ -57,3 +57,30 @@ The final frontend hardening record is
 evidence-liveness, state-distinction, authority-binding, object-isolation, and
 finality-safe transaction invariants exercised by the repository and browser
 regression suites.
+
+## Release-hardening verification
+
+| Gate | Result |
+| --- | --- |
+| Direct tests | `152 passed` |
+| Mutation suite | `55/55 killed`, `0 survivors` |
+| Frontend tests | `25 passed` |
+| Local browser audit | `18 passed + 1 production-only skipped` |
+| Production browser audit | `19/19 passed` |
+| External security mode | `OPTIONAL`; no external audit claimed |
+
+The local and production browser audits run the same 19-case route and storage
+suite. Only the canonical chain-backed verified-release case is skipped by the
+local audit; the separate production job executes it and uploads its HTML
+report, screenshots, and failure traces.
+
+## Provenance boundaries
+
+- Contract source revision: `cfb25215497adeb41357196caa8c755a685b4cf2`
+- Canonical deployment: governor `0xb28b8E7F8930b4bd7Ed8572dA7e51AA4ca9D7cA8`, target `0xaF9ABA4DD9869d5F92EeA92c700E5f09A6978e21`
+- Current repository release head: the final `main` SHA recorded in the GitHub V2.3 release notes
+- Current frontend build head and Vercel deployment ID: the final production deployment recorded in the GitHub V2.3 release notes and [`deployments/studionet/v2.3/RELEASE_PROVENANCE.json`](deployments/studionet/v2.3/RELEASE_PROVENANCE.json)
+
+The frontend release head is intentionally distinct from the historical
+contract source revision. This hardening pass performed no contract
+redeployment, governor write, target write, proposal, or other chain write.

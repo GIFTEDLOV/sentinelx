@@ -1,4 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+
+const PRODUCTION_AUDIT = process.env.SENTINELX_PRODUCTION_AUDIT === "1";
 
 const APP_ROUTES = [
   "/",
@@ -47,6 +51,8 @@ async function auditRoute(page: Page, route: string): Promise<void> {
   await expect(page.locator("body")).not.toContainText("Something went wrong");
   await expect(page.locator("body")).toContainText("Studionet");
   await expect(page.locator("body")).toContainText("61999");
+  const overflow = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+  expect(overflow.scrollWidth, `${route} horizontal overflow`).toBeLessThanOrEqual(overflow.innerWidth + 1);
   expect(consoleErrors, `${route} console errors`).toEqual([]);
   expect(pageErrors, `${route} page errors`).toEqual([]);
   expect(failedRequests.filter((entry) => !entry.includes("favicon")), `${route} failed requests`).toEqual([]);
@@ -72,12 +78,32 @@ test.describe("SentinelX production browser routes", () => {
   });
 
   test("renders canonical verified release data in production", async ({ page }) => {
-    test.skip(/localhost|127\.0\.0\.1/.test(process.env.SENTINELX_BROWSER_BASE_URL || ""), "canonical chain assertion is production-only");
+    test.skip(!PRODUCTION_AUDIT, "canonical chain assertion is production-only");
     await page.goto("/app/releases/1", { waitUntil: "domcontentloaded" });
     await expect(page.locator("body")).toContainText("VERIFIED", { timeout: 10_000 });
     const bodyText = await page.locator("body").innerText();
     expect(bodyText).toContain("1073b34f14");
     expect(bodyText).toContain("0xaF9ABA4D");
     expect(bodyText).not.toContain("Something went wrong");
+
+    await page.goto("/app/settings", { waitUntil: "domcontentloaded" });
+    const settingsText = await page.locator("body").innerText();
+    expect(settingsText).toContain("0xb28b8E7F8930b4bd7Ed8572dA7e51AA4ca9D7cA8");
+    expect(settingsText).toContain("0xaF9ABA4DD9869d5F92EeA92c700E5f09A6978e21");
+    const screenshotDir = test.info().outputPath("screenshots");
+    await mkdir(screenshotDir, { recursive: true });
+    for (const viewport of [
+      [1440, 900],
+      [430, 932],
+      [390, 844],
+    ] as const) {
+      const [width, height] = viewport;
+      await page.setViewportSize({ width, height });
+      await page.goto("/app", { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(1000);
+      const overflow = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      expect(overflow.scrollWidth, `${width}x${height} horizontal overflow`).toBeLessThanOrEqual(overflow.innerWidth + 1);
+      await page.screenshot({ path: join(screenshotDir, `${width}x${height}.png`), fullPage: true });
+    }
   });
 });

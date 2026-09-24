@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateFeeProfile } from "./fees";
+import { feeConfigurationSummary, validateFeeProfile } from "./fees";
 
 const entry = { gasUsed: "125000", transactionValue: "0" };
 
@@ -14,5 +14,13 @@ describe("Studionet stable fee adapter", () => {
 
   it("rejects non-numeric native gas observations", () => {
     expect(() => validateFeeProfile({ version: 1, network: "studionet", chainId: 61999, methods: { capture_evidence: { ...entry, gasUsed: "guess" } } })).toThrow("invalid measured stable gas entry");
+  });
+
+  it("presents Studionet as gasless without a charged protocol fee", () => {
+    expect(feeConfigurationSummary()).toMatchObject({
+      gasless: true,
+      protocolFeeLabel: "None · gasless Studionet",
+      resourceObservationLabel: "Native eth_estimateGas only",
+    });
   });
 });

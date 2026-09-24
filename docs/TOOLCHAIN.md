@@ -1,5 +1,15 @@
 # SentinelX stable toolchain
 
+Official guidance audit date: **2026-09-24**. The current Builders resources,
+full documentation, GenLayer Skills, and the `genlayer-dev` skills for
+`write-contract`, `genvm-lint`, `direct-tests`, `integration-tests`, and
+`genlayer-cli` were consulted before this release-hardening pass. The Skills
+repository was audited at commit
+`195deb417c2ac4a90dd23429a0c3940bde80389a`.
+
+See [`TOOLCHAIN_COMPATIBILITY.md`](TOOLCHAIN_COMPATIBILITY.md) for the exact
+metadata exception, installation order, and Direct Mode API assertion.
+
 The canonical SentinelX V2.3 release uses the pinned stable compatibility
 family below:
 
@@ -17,10 +27,14 @@ The canonical network is Studionet, RPC `https://studio.genlayer.com/api`,
 chain ID `61999`. Studio-dev 61997 is historical qualification evidence only.
 
 The selected SDK versions are recorded in `requirements.txt`,
-`gltest.config.yaml`, and `deployments/studionet/v2.3/SOURCE_MANIFEST.json`.
+`requirements-release.txt`, `constraints-release.txt`, `gltest.config.yaml`,
+and `deployments/studionet/v2.3/SOURCE_MANIFEST.json`.
 
-Canonical writes use the stable SDK-native fee model, current network policy,
-single-broadcast journaling, immediate hash persistence, and same-hash
-reconciliation. Every parent and internal child must reach `FINALIZED` plus
-`FINISHED_WITH_RETURN`. The static and semantic gates remain separate; the
-exact qualified results are recorded in the Studionet readiness manifest.
+Canonical writes use the stable SDK-native transaction path, current network
+policy, single-broadcast journaling, immediate hash persistence, and same-hash
+reconciliation. Studionet is gasless in this stable family; native
+`eth_estimateGas` values are resource observations, not charged protocol fees.
+Every parent and internal child must reach `FINALIZED` plus
+`FINISHED_WITH_RETURN`. The official `genvm-lint check`, `schema`, and
+`typecheck` gates remain separate from SentinelX's semantic AST gate; the exact
+qualified results are recorded in the Studionet readiness manifest.

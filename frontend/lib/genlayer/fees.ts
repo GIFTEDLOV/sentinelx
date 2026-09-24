@@ -54,7 +54,10 @@ export type FeeQuoteSource = "stable-sdk-native";
 
 export interface FeeQuote {
   source: FeeQuoteSource;
-  gasless: false;
+  /** Studionet stable has protocol-fee accounting disabled. */
+  gasless: true;
+  /** Native EVM gas/resource observation; this is not a user-paid fee. */
+  resourceGasEstimate?: string;
 }
 
 /**
@@ -69,18 +72,34 @@ export async function estimateWriteFees(args: {
 }): Promise<FeeQuote> {
   if (!args.account) throw new Error("stable write estimation requires an account");
   const client = getGenLayerClient(undefined, args.account);
-  await client.estimateTransactionGas({
+  const resourceGasEstimate = await client.estimateTransactionGas({
     from: args.account,
     to: args.address,
     value: BigInt(0),
   });
-  return { source: "stable-sdk-native", gasless: false };
+  return {
+    source: "stable-sdk-native",
+    gasless: true,
+    resourceGasEstimate: resourceGasEstimate.toString(),
+  };
 }
 
-export function feeConfigurationSummary(): { configured: boolean; rpcUrl: string; chainId: number } {
+export interface FeePresentation {
+  configured: boolean;
+  rpcUrl: string;
+  chainId: number;
+  gasless: true;
+  protocolFeeLabel: "None · gasless Studionet";
+  resourceObservationLabel: "Native eth_estimateGas only";
+}
+
+export function feeConfigurationSummary(): FeePresentation {
   return {
     configured: Boolean(process.env.NEXT_PUBLIC_SENTINELX_FEE_PROFILE_URL),
     rpcUrl: getRpcUrl(),
     chainId: STUDIONET_CHAIN_ID,
+    gasless: true,
+    protocolFeeLabel: "None · gasless Studionet",
+    resourceObservationLabel: "Native eth_estimateGas only",
   };
 }

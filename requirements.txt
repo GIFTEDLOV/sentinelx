@@ -1,4 +1,6 @@
-# SentinelX Studionet stable qualification family.
+# SentinelX Studionet stable qualification family. For deterministic clean
+# installs, use requirements-release.txt plus constraints-release.txt and the
+# documented --no-deps genlayer-test exception.
 genlayer-py==0.18.0
 # genlayer-test 0.29.2 is installed with --no-deps in the stable
 # qualification environment because its published metadata still declares

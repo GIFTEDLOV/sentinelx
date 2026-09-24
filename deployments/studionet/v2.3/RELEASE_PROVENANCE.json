@@ -1,19 +1,25 @@
 {
-  "schema": "sentinelx-studionet-v23-release-provenance-v1",
+  "schema": "sentinelx-studionet-v23-release-provenance-v2",
   "network": "Studionet",
   "rpc": "https://studio.genlayer.com/api",
   "chain_id": 61999,
   "source_revision": "cfb25215497adeb41357196caa8c755a685b4cf2",
   "qualification_head": "7dca629f7e413deaffad106a6ccad30164ac4ea7",
   "canonical_deployment_artifact_head": "55596ade32f3f76069b356d901a284e24c338d80",
-  "final_hardening_head": "76c8fb1db550b01c4ba2772f60a244ea1a9aea83",
+  "repository_provenance_head": "3760da3de2c844c78762840508154033c7f47d5e",
   "canonical_deployment": {
     "status": "CANONICAL_DEPLOYED",
     "governor": "0xb28b8E7F8930b4bd7Ed8572dA7e51AA4ca9D7cA8",
     "target": "0xaF9ABA4DD9869d5F92EeA92c700E5f09A6978e21",
     "proposal_id": 1,
     "proposal_state": "VERIFIED",
-    "installed_safe_sha256": "1073b34f141b9dc5ba689ef3d98293fd628e30695dbd9092a9c6ecaba3d8c27d"
+    "installed_safe_sha256": "1073b34f141b9dc5ba689ef3d98293fd628e30695dbd9092a9c6ecaba3d8c27d",
+    "source_hashes": {
+      "governor": "1c53c221300a5fd4e901a3608c72f87c88ed14136f5a95f786a2854355270423",
+      "target": "47bf21c12574ec8d43a41d79c987e1206b3c65b3e7f0e7998c8a3ff1179d2631",
+      "safe": "1073b34f141b9dc5ba689ef3d98293fd628e30695dbd9092a9c6ecaba3d8c27d",
+      "unsafe": "380c80e653a2d87e02648eec57dbfd46f898fb1a4cccfbe349c027ffa9149340"
+    }
   },
   "profiled_non_canonical": {
     "governor": "0x178Cc14e39E5873C4EaB2590B1a94b92694545ac",
@@ -21,5 +27,13 @@
   },
   "historical_studio_dev_preserved": true,
   "canonical_contracts_redeployed_during_hardening": false,
-  "new_chain_writes_during_hardening": false
+  "new_chain_writes_during_hardening": false,
+  "provenance_boundaries": {
+    "contract_source_revision": "cfb25215497adeb41357196caa8c755a685b4cf2",
+    "canonical_contract_deployment": "canonical_deployment",
+    "current_repository_release_head": "reported in the final GitHub release and final report",
+    "current_frontend_build_head": "verified from the final Vercel deployment metadata",
+    "current_vercel_deployment_id": "reported in the final GitHub release and final report",
+    "frontend_source_is_contract_source_revision": false
+  }
 }

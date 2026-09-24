@@ -28,8 +28,11 @@ NEXT_PUBLIC_SENTINELX_FEE_PROFILE_URL=<immutable raw GitHub URL>
 ```
 
 The production deployment uses the canonical addresses above; disposable
-profile addresses are never substituted. Write quoting does not require a fee
-profile, but the immutable qualified Studionet profile is configured for
+profile addresses are never substituted. Stable Studionet is gasless, so the
+console presents no charged protocol fee. `eth_estimateGas`, when retained for
+write preflight, is labeled as a native network-resource observation only;
+application value remains a separate concept. Write quoting does not require a
+fee profile, but the immutable qualified Studionet profile is configured for
 operator visibility.
 
 The historical V1 and disposable profile data are not served as production

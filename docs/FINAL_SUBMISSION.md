@@ -14,10 +14,12 @@ The canonical deployment is on Studionet, chain `61999`, at
 - Protected target: `0xaF9ABA4DD9869d5F92EeA92c700E5f09A6978e21`
 - Production UI: <https://sentinelx-lac.vercel.app>
 - Repository: <https://github.com/GIFTEDLOV/sentinelx>
-- Source revision: `cfb25215497adeb41357196caa8c755a685b4cf2`
+- Contract source revision: `cfb25215497adeb41357196caa8c755a685b4cf2`
 - Qualification head: `7dca629f7e413deaffad106a6ccad30164ac4ea7`
 - Canonical deployment artifact head: `55596ade32f3f76069b356d901a284e24c338d80`
-- Final hardening head: `76c8fb1db550b01c4ba2772f60a244ea1a9aea83`
+- Current repository release head: recorded in the final GitHub V2.3 release notes
+- Current frontend build head: recorded separately from the contract source revision in the final release provenance
+- Current Vercel deployment ID: recorded in the final release provenance and release notes
 
 The exact source hashes and toolchain are in
 `deployments/studionet/v2.3/SOURCE_MANIFEST.json`. The canonical transaction
@@ -83,6 +85,19 @@ explicitly non-canonical.
 The full live proof, staged digest, snapshot digest, CI evidence commit, and
 readiness status are committed under `artifacts/studionet/v2.3/` and
 `deployments/studionet/v2.3/`.
+
+## Hardening verification
+
+- Direct suite: `152 passed`
+- Mutation suite: `55/55 killed`, `0 survivors`
+- Frontend: `25 passed`, including stable Studionet fee-presentation coverage
+- Local browser audit: `18 passed + 1 production-only skipped`
+- Production browser audit: `19/19 passed`, including canonical verified release data, governor and target addresses, transaction-storage resilience, navigation, hydration, console, overflow, and screenshots at `1440x900`, `430x932`, and `390x844`
+- Source parity: all four frozen contract hashes unchanged
+- Safe release: verified
+- Unsafe release: rejected and not installed
+- External security mode: `OPTIONAL`; no external security audit claimed
+- Chain activity in this hardening pass: no writes and no contract redeployment
 
 ## Final hardening
 

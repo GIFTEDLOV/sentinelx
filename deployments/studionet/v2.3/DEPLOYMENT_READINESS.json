@@ -47,9 +47,10 @@
   "fee_profile_sha256": "9d50b9cc5fa0e6c66a32eebe9cc68c55f55662009e2f20f22ae6b80138f6776f",
   "gates": {
     "browser_e2e": {
-      "count": 18,
+      "local_count": 18,
+      "production_count": 19,
       "result": "PASS",
-      "scope": "canonical route hydration, corrupt/valid transaction storage, local mocked RPC only"
+      "scope": "local route hydration, corrupt/valid transaction storage, and production canonical release audit"
     },
     "canonical_live_proof": "PASS",
     "canonical_safe_verified": "PASS",
@@ -62,7 +63,7 @@
     "frontend_build": "PASS",
     "frontend_lint": "PASS",
     "frontend_tests": {
-      "count": 24,
+      "count": 25,
       "result": "PASS"
     },
     "frontend_typecheck": "PASS",
@@ -90,6 +91,7 @@
     "wallet_wrong_network_write_guard": "PASS"
   },
   "git_sha": "76c8fb1db550b01c4ba2772f60a244ea1a9aea83",
+  "git_sha_role": "historical readiness artifact generation head; not the contract source revision",
   "historical_studio_dev": {
     "excluded_from_stable_profile": true,
     "new_writes": false,
@@ -110,7 +112,22 @@
       "target": "0x9e0e22C8f35312E75C66f0255d4559f90e4fCd09"
     },
     "QUALIFIED": "7dca629f7e413deaffad106a6ccad30164ac4ea7",
-    "source_revision": "cfb25215497adeb41357196caa8c755a685b4cf2"
+    "source_revision": "cfb25215497adeb41357196caa8c755a685b4cf2",
+    "contract_source_revision": "cfb25215497adeb41357196caa8c755a685b4cf2",
+    "canonical_contract_deployment": {
+      "governor": "0xb28b8E7F8930b4bd7Ed8572dA7e51AA4ca9D7cA8",
+      "target": "0xaF9ABA4DD9869d5F92EeA92c700E5f09A6978e21",
+      "source_hashes": {
+        "governor": "1c53c221300a5fd4e901a3608c72f87c88ed14136f5a95f786a2854355270423",
+        "target": "47bf21c12574ec8d43a41d79c987e1206b3c65b3e7f0e7998c8a3ff1179d2631",
+        "safe": "1073b34f141b9dc5ba689ef3d98293fd628e30695dbd9092a9c6ecaba3d8c27d",
+        "unsafe": "380c80e653a2d87e02648eec57dbfd46f898fb1a4cccfbe349c027ffa9149340"
+      }
+    },
+    "current_repository_release_head": "reported in the final GitHub release and final report",
+    "current_frontend_build_head": "verified from the final Vercel deployment metadata",
+    "current_vercel_deployment_id": "reported in the final GitHub release and final report",
+    "frontend_source_is_contract_source_revision": false
   },
   "qualification_head": "7dca629f7e413deaffad106a6ccad30164ac4ea7",
   "result": "PASS",

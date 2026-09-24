@@ -7,8 +7,14 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
+  GENVM_VERSION: "v0.2.12"
+
 jobs:
-  direct-and-preflight:
+  contracts:
+    name: contracts
     runs-on: ubuntu-latest
     env:
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -17,52 +23,47 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install --upgrade pip
-      - name: Install pinned stable qualification stack
+      - name: Install deterministic stable release stack
         run: |
-          python -m pip install "genlayer-py==0.18.0" "genvm-linter==0.11.0" "web3==8.0.0" "pytest==8.4.1" "pyright==1.1.410"
-          python -m pip install --no-deps "genlayer-test==0.29.2"
-          python -m pip install colorama python-dotenv pyyaml
-      - run: python -m pytest tests/direct -q
-      - run: python scripts/v2_mutation_runner.py --json
-      - run: python scripts/studionet_preflight.py
-      - run: python scripts/validate_studionet_v23_semantics.py
-      - run: python scripts/release_integrity.py
-
-  static-ast-lint:
-    name: Static AST lint (genvm-linter 0.11.0)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install "genvm-linter==0.11.0"
-      - name: Lint all SentinelX V2 contracts
+          python -m pip install --upgrade pip
+          python -m pip install --requirement requirements-release.txt --constraint constraints-release.txt
+          python -m pip install --no-deps --constraint constraints-release.txt genlayer-test==0.29.2
+      - name: Assert stable toolchain compatibility
+        run: python scripts/verify_toolchain_compatibility.py
+      - name: Run official GenVM checks for every frozen contract
         run: |
           for contract in contracts/sentinelx_governor.py contracts/protected_app_v1.py contracts/protected_app_v2_safe.py contracts/protected_app_v2_unsafe.py; do
-            genvm-lint lint "$contract"
+            genvm-lint check "$contract" --json
           done
-
-  secret-scan:
-    name: Tracked-file secret scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python scripts/secret_scan.py
+      - name: Extract schemas for every frozen contract
+        run: |
+          for contract in contracts/sentinelx_governor.py contracts/protected_app_v1.py contracts/protected_app_v2_safe.py contracts/protected_app_v2_unsafe.py; do
+            genvm-lint schema "$contract" --json
+          done
+      - name: Typecheck every frozen contract
+        run: |
+          for contract in contracts/sentinelx_governor.py contracts/protected_app_v1.py contracts/protected_app_v2_safe.py contracts/protected_app_v2_unsafe.py; do
+            genvm-lint typecheck "$contract" --json
+          done
+      - name: Preserve SentinelX semantic AST gate
+        run: python scripts/validate_studionet_v23_semantics.py
+      - name: Run Direct Mode suite
+        run: python -m pytest tests/direct -q
+      - name: Run mutation suite
+        run: python scripts/v2_mutation_runner.py --json
+      - name: Run stable Studionet preflight
+        run: python scripts/studionet_preflight.py
+      - name: Run release integrity and source hash gate
+        run: python scripts/release_integrity.py
 
   frontend:
-    name: Frontend tests, typecheck, build and lint
+    name: frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
@@ -71,20 +72,24 @@ jobs:
         working-directory: frontend
       - run: npm run typecheck
         working-directory: frontend
-      - run: npm run build
-        working-directory: frontend
       - run: npm run lint
         working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - name: Enforce stable network and canonical address guard
+        working-directory: frontend
+        run: |
+          node -e 'const fs=require("fs"); const text=fs.readFileSync("lib/genlayer/chains.ts","utf8"); for (const value of ["https://studio.genlayer.com/api","STUDIONET_CHAIN_ID = 61999","0xb28b8E7F8930b4bd7Ed8572dA7e51AA4ca9D7cA8","0xaF9ABA4DD9869d5F92EeA92c700E5f09A6978e21"]) { if (!text.includes(value)) throw new Error(`missing ${value}`); } if (require("./package.json").dependencies["genlayer-js"] !== "1.1.8") throw new Error("genlayer-js stable pin drifted");'
 
-  browser-hydration:
-    name: Local browser hydration and route smoke
+  browser-local:
+    name: browser-local
     runs-on: ubuntu-latest
     needs: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
@@ -94,9 +99,68 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
       - name: Start local production server
-        run: npm run start -- -p 3000 > /tmp/sentinelx-next.log 2>&1 &
         working-directory: frontend
-      - run: npm run test:browser
+        run: |
+          npm run start -- -p 3000 > "$RUNNER_TEMP/sentinelx-next.log" 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:3000/ > /dev/null
+      - name: Run local browser audit (18 passed + 1 production-only skipped)
         working-directory: frontend
         env:
           SENTINELX_BROWSER_BASE_URL: http://localhost:3000
+          SENTINELX_PRODUCTION_AUDIT: "0"
+        run: npm run test:browser -- e2e/production.spec.ts
+      - name: Upload local Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-local-artifacts
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+            ${{ runner.temp }}/sentinelx-next.log
+          if-no-files-found: ignore
+
+  browser-production:
+    name: browser-production
+    runs-on: ubuntu-latest
+    needs: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Run exact production browser audit (19/19)
+        working-directory: frontend
+        env:
+          SENTINELX_BROWSER_BASE_URL: https://sentinelx-lac.vercel.app
+          SENTINELX_PRODUCTION_AUDIT: "1"
+        run: npm run test:browser -- e2e/production.spec.ts
+      - name: Upload production Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-production-artifacts
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          if-no-files-found: ignore
+
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/secret_scan.py
