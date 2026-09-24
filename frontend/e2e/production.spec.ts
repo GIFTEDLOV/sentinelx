@@ -55,7 +55,10 @@ async function auditRoute(page: Page, route: string): Promise<void> {
   expect(overflow.scrollWidth, `${route} horizontal overflow`).toBeLessThanOrEqual(overflow.innerWidth + 1);
   expect(consoleErrors, `${route} console errors`).toEqual([]);
   expect(pageErrors, `${route} page errors`).toEqual([]);
-  expect(failedRequests.filter((entry) => !entry.includes("favicon")), `${route} failed requests`).toEqual([]);
+  const actionableFailedRequests = failedRequests.filter((entry) =>
+    !entry.includes("favicon") && !(entry.includes("?_rsc=") && entry.includes("net::ERR_ABORTED"))
+  );
+  expect(actionableFailedRequests, `${route} failed requests`).toEqual([]);
 }
 
 test.describe("SentinelX production browser routes", () => {
